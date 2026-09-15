@@ -11,7 +11,7 @@ import CoffeeMug from "@/components/Toons/CoffeeMug/CoffeeMug.jsx";
 
 // Scss
 import "@/css/pages/404.scss";
-import "@/css/components/SceneSection.scss";
+import "@/css/Components/SceneSection.scss";
 
 export default function NotFound() {
   return (

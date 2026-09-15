@@ -1,7 +1,7 @@
 // React and util
 import { React, useEffect, useState } from "react";
 import { fetchData, iconMap, Random } from "@/utils.jsx";
-import ProgressiveImage from "react-progressive-image";
+import ProgressiveImage from "../components/ProgressiveImage";
 
 // Gsap and stuff
 import { useGSAP } from "@gsap/react";
