@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* One material: white dots on neutral dark. Blue means in progress, lime means done. */
+:root {
+  --ground: #19191b;
+  --stage: #19191b;
+  --panel: #222225;
+  --line: #333338;
+  --line-strong: #4a4a52;
+  --ink: #e8eaed;
+  --body: #c9cfd8;
+  --muted: #9aa3af;
+  --dot: #ffffff;
+  --progress: #7fa6ff;
+  --done: #c8f169;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-stage: var(--stage);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-dot: var(--dot);
+  --color-progress: var(--progress);
+  --color-done: var(--done);
+  --font-sans: var(--font-display);
+  --font-mono: var(--font-code);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--done);
+  color: var(--ground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--done);
+  outline-offset: 3px;
+}
