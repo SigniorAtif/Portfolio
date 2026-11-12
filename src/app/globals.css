@@ -164,6 +164,32 @@ body {
   }
 }
 
+/* ---------- footer ---------- */
+/* The name, stretched tall from its base. The wrapper's top padding makes room for the stretch. */
+.footmark {
+  --stretch: 1.4;
+  overflow: hidden;
+  margin-top: clamp(0.75rem, 2vw, 1.5rem);
+  padding-top: calc((var(--stretch) - 1) * 0.78em);
+  /* BluePeak sets 14.6vw for ten letters; nine need a little more to reach the same edges. */
+  font-size: 15.4vw;
+}
+.footmark-in {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.08em;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 0.7;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  transform: scaleY(var(--stretch));
+  transform-origin: 50% 100%;
+}
+.footmark-in span {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after {
     animation: none;
