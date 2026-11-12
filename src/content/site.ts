@@ -12,6 +12,9 @@ export const site = {
   email: "mr.dimlit@gmail.com",
   location: "Bhubaneswar, IN",
   signOff: "Written at 3am from inside rury",
+  description: "Atif Ahmed builds products, tools for agents and the Linux desktop he writes them on.",
+  headline: "I build products, tools for agents and the desktop I write them on.",
+  alumniOf: "Kalinga Institute of Industrial Technology",
 } as const;
 
 export type SiteLink = { label: string; href: string };
