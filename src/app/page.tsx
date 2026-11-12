@@ -3,6 +3,8 @@ import { FooterCurtain } from "@/components/footer/FooterCurtain";
 import { Hero } from "@/components/hero/Hero";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { SiteMark } from "@/components/nav/SiteMark";
+import { Reel } from "@/components/reel/Reel";
+import { reel } from "@/content/reel";
 
 export default function Home() {
   return (
@@ -10,7 +12,8 @@ export default function Home() {
       <SiteMark />
       <main>
         <Hero />
-        {/* Reel, Work and Myself land here next. */}
+        {reel.enabled && <Reel />}
+        {/* Work and Myself land here next. */}
         <div id="work" className="h-[60svh]" />
       </main>
       <FooterCurtain />
