@@ -164,6 +164,26 @@ body {
   }
 }
 
+/* ---------- reel ---------- */
+/* Before the script takes over (and under reduced motion) the stage simply
+   fills its tile. The takeover sizes it to the viewport and writes transform
+   and clip-path every frame. */
+.reel-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--ground);
+}
+.reel-stage[data-takeover] {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  border-radius: 0;
+  transform-origin: 50% 50%;
+  will-change: transform, clip-path;
+}
+
 /* ---------- site mark ---------- */
 /* The name, fixed in the top-left corner. It sits exactly where the hero's
    gutter and top padding put it, so the bar's own padding is pulled back out. */
