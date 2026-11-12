@@ -164,6 +164,23 @@ body {
   }
 }
 
+/* ---------- dot material helpers ---------- */
+/* A plate of faint dots: stands in wherever media is missing or not chosen yet. */
+.dot-plate {
+  background-color: var(--panel);
+  background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1.5px);
+  background-size: 10px 10px;
+  background-position: 50% 50%;
+}
+/* Text drawn in dots, like the portrait. Needs a heavy weight to stay readable. */
+.dot-ink {
+  background-image: radial-gradient(circle, var(--dot) 0.9px, transparent 1.3px);
+  background-size: 3.5px 3.5px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 /* ---------- reel ---------- */
 /* Before the script takes over (and under reduced motion) the stage simply
    fills its tile. The takeover sizes it to the viewport and writes transform
@@ -182,6 +199,301 @@ body {
   border-radius: 0;
   transform-origin: 50% 50%;
   will-change: transform, clip-path;
+}
+
+/* ---------- work deck ---------- */
+.deck-stage {
+  --card-w: 120px;
+  --card-h: 212px;
+  perspective: 1400px;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+@media (min-width: 640px) {
+  .deck-stage {
+    --card-w: 168px;
+    --card-h: 298px;
+  }
+}
+.deck-stage[data-dragging="true"] {
+  cursor: grabbing;
+}
+.deck-wheel {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+}
+.deck-card {
+  position: absolute;
+  left: calc(var(--card-w) / -2);
+  top: calc(var(--card-h) / -2);
+  width: var(--card-w);
+  height: var(--card-h);
+  visibility: hidden;
+  transform-style: preserve-3d;
+  will-change: transform;
+  border-radius: 14px;
+  -webkit-user-drag: none;
+}
+.deck-face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  backface-visibility: hidden;
+  transition: border-color var(--dur-ui) var(--ease-out);
+}
+.deck-back {
+  transform: rotateY(180deg);
+}
+.deck-card[data-focused="true"] .deck-front {
+  border-color: var(--ink);
+}
+.deck-media {
+  transform: scale(1.08);
+  transition: transform 0.9s var(--ease-out);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-media {
+  transform: scale(1);
+}
+/* Hover: a frame draws itself round the card and a label bar wipes in along the bottom. */
+.deck-frame {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--done);
+  border-radius: 20px;
+  box-shadow: 0 30px 60px -24px var(--done);
+  opacity: 0.95;
+  clip-path: inset(0 100% 0 0 round 20px);
+  backface-visibility: hidden;
+  pointer-events: none;
+  transition: clip-path 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.deck-label {
+  position: absolute;
+  inset: auto 7px 7px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: var(--done);
+  color: var(--ground);
+  clip-path: inset(0 100% 0 0 round 9px);
+  transition: clip-path 0.5s cubic-bezier(0.22, 1, 0.36, 1) 50ms;
+}
+.deck-label b {
+  flex: none;
+  font-family: var(--font-code), monospace;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.deck-label span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-label i {
+  flex: none;
+  font-size: 13px;
+  font-style: normal;
+  transform: translate(-6px, 6px);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s;
+}
+.deck-caption {
+  transition: opacity 0.3s;
+}
+.deck-card:is([data-hover], :focus-visible) .deck-frame {
+  clip-path: inset(0 round 20px);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-label {
+  clip-path: inset(0 round 9px);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-label i {
+  transform: none;
+}
+.deck-card:is([data-hover], :focus-visible) .deck-caption {
+  opacity: 0;
+}
+/* The word that rides with the pointer while it is on a card. */
+.deck-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  margin: 14px 0 0 14px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--font-code), monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  scale: 0.7;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    scale 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.deck-cursor[data-on] {
+  opacity: 1;
+  scale: 1;
+}
+@media (pointer: coarse) {
+  .deck-cursor {
+    display: none;
+  }
+}
+
+/* ---------- work opening ---------- */
+.work-intro {
+  --box-top: clamp(84px, 14svh, 128px);
+  --box-bottom: clamp(132px, 21svh, 188px);
+}
+/* Waiting over the reel: see-through, and out of the way of the video's own controls. */
+.work-intro[data-phase="idle"] {
+  pointer-events: none;
+}
+/* A sheet of ground with a hole the shape of the grown video. */
+.work-curtain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.work-curtain > div {
+  position: absolute;
+  inset: var(--gutter);
+  border-radius: 20px;
+  box-shadow: 0 0 0 200vmax var(--ground);
+}
+/* The frame, at its final place. The script scales it up to cover the screen
+   and lets it close. */
+.work-scene {
+  position: absolute;
+  inset: var(--box-top) var(--gutter) var(--box-bottom);
+  overflow: hidden;
+  border-radius: 28px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  container-type: size;
+}
+/* Cards are sized from the frame: the lifted top card is a little over half its height. */
+.work-scene .deck-stage {
+  --card-h: clamp(150px, 42cqh, 320px);
+  --card-w: calc(var(--card-h) * 0.5625);
+}
+.work-scene[data-backdrop="stars"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s linear;
+}
+.work-scene[data-backdrop="stars"][data-framed="true"]::after {
+  opacity: 1;
+}
+.work-layer {
+  opacity: 0;
+  transition: opacity 0.6s linear;
+}
+.work-layer[data-on="true"] {
+  opacity: 1;
+}
+.work-clouds {
+  position: absolute;
+  left: 50%;
+  bottom: -9%;
+  width: max(104%, 880px);
+  aspect-ratio: 3 / 1;
+  margin-left: calc(max(104%, 880px) / -2);
+  pointer-events: none;
+  will-change: transform;
+}
+.work-clouds img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Depth: the backdrop gets more contrast and a dark tint, a little heavier at the edges.
+   Both sit behind the cards and the front clouds, which stay untouched. */
+.work-scene[data-backdrop="day"] .work-layer:is(img),
+.work-scene[data-backdrop="night"] .work-layer:is(img) {
+  filter: contrast(1.14) saturate(1.05);
+}
+.work-clouds .work-layer:is(img) {
+  filter: none !important;
+}
+.work-haze {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 50% 42%, transparent 35%, rgb(0 0 0 / 0.3) 100%),
+    rgb(0 0 0 / 0.26);
+}
+.work-scene[data-backdrop="stars"] .work-haze {
+  display: none;
+}
+/* Cards sit on a picture here, not on the ground, so they lose the hairline. */
+.work-scene .deck-face {
+  border-color: transparent;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.55);
+}
+.work-veil {
+  position: absolute;
+  inset: var(--gutter);
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--panel);
+  will-change: clip-path;
+}
+/* One word of text that swaps in place: a window the word slides through. */
+.swap-word {
+  display: inline-block;
+  overflow: clip;
+  padding-block: 0.16em;
+  margin-block: -0.16em;
+  vertical-align: top;
+}
+
+/* The card that follows the pointer over the project list. */
+.work-peek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  width: clamp(280px, 26vw, 400px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
+  pointer-events: none;
 }
 
 /* ---------- site mark ---------- */
@@ -366,9 +678,18 @@ body {
   }
   .swap-in,
   .arrow,
+  .deck-media,
   .site-mark,
   .site-mark *,
   .site-mark-bar::before {
     transition: none !important;
+  }
+  .deck-media {
+    transform: none;
+  }
+  .deck-frame,
+  .deck-label,
+  .deck-label i {
+    transition: none;
   }
 }
