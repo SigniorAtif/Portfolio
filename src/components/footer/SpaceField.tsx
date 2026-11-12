@@ -31,7 +31,15 @@ function seeded(seed: number) {
   };
 }
 
-export function SpaceField() {
+type Props = {
+  /** Draws the field inside its parent box instead of across the viewport behind the footer. */
+  fill?: boolean;
+  /** Multiplies how many dots there are and how big, for a box much smaller than a screen. */
+  density?: number;
+  dotScale?: number;
+};
+
+export function SpaceField({ fill = false, density = 1, dotScale = 1 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -51,7 +59,7 @@ export function SpaceField() {
     const draw = (ms: number) => {
       const t = ms / 1000;
       const unit = height / 1.77; // px per scene unit: the hero frame is 1.77 units tall
-      const size = (height / 800) * DOT_PX;
+      const size = (height / 800) * DOT_PX * dotScale;
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = colour;
       for (const dot of dots) {
@@ -72,13 +80,14 @@ export function SpaceField() {
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
+      width = fill ? footer.clientWidth : window.innerWidth;
+      height = fill ? footer.clientHeight : window.innerHeight;
+      if (!width || !height) return;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const random = seeded(7);
-      const count = Math.min(MAX_DOTS, Math.round((width * height) / AREA_PER_DOT));
+      const count = Math.min(MAX_DOTS, Math.round(((width * height) / AREA_PER_DOT) * density));
       // Spread a little past the edges so drifting dots never leave a bare rim.
       dots = Array.from({ length: count }, () => ({
         x: random() * 1.3 - 0.15,
@@ -99,12 +108,17 @@ export function SpaceField() {
     resize();
     observer.observe(footer);
     window.addEventListener("resize", resize);
+    const sizes = fill ? new ResizeObserver(resize) : null;
+    sizes?.observe(footer);
     return () => {
       cancelAnimationFrame(frame);
+      sizes?.disconnect();
       observer.disconnect();
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [fill, density, dotScale]);
+
+  if (fill) return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />;
 
   return (
     <canvas

@@ -80,7 +80,14 @@ const bustVertex = /* glsl */ `
     b += shine * .8 * facing;
     if (aFlag > .5) {                 // glasses: same white, just brighter
       float glint = smoothstep(.09, 0., abs(position.x - uGlint)); // crosses the frame every few seconds
+      // Visibility comes from the turned normal, like every other dot.
       b = (.9 + lit * uLightOn + shine * .4 + glint * 1.2) * mix(.08, 1., smoothstep(-.35, .15, normal.z));
+      // The arms run back from the lenses (lens plane is z = .5). On a hard
+      // turn the far arm swings across the near lens although the head hides
+      // it by then, so arm dots on the side turned away fade with the turn.
+      float arm = smoothstep(.45, .3, position.z);
+      float farSide = step(0., position.x * yaw);
+      b *= 1. - arm * farSide * smoothstep(.06, .36, abs(yaw));
     }
     vBright = mix(.75, 1., t) * b;
 

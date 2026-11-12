@@ -57,6 +57,7 @@ export const projects: Project[] = [
     ],
     live: "https://ruyah.ahmedatif.in",
     source: "https://github.com/SigniorAtif/ruyah",
+    media: "/work/ruyah.webp",
   },
   {
     slug: "claude-code-connector",
@@ -71,6 +72,7 @@ export const projects: Project[] = [
     facts: [],
     live: "https://community.obsidian.md/plugins/claude-code-connector",
     source: "https://github.com/SigniorAtif/Obsidian-CC-connector",
+    media: "/work/claude-code-connector.webp",
   },
   {
     slug: "pixan",
@@ -85,41 +87,11 @@ export const projects: Project[] = [
       { value: "9", label: "SQL migrations, default-deny throughout" },
       { value: "5", label: "posts a day, by design" },
     ],
-    // TODO(atif): private repo and a fork. Confirm what can be shown and who to credit.
-  },
-  {
-    slug: "deploy-or-die",
-    order: 5,
-    name: "Deploy or Die",
-    kind: "Event stack",
-    oneLiner: "The site, quiz and scoring tools behind a GDG on Campus KIIT event.",
-    summary:
-      "A scroll-driven landing page, a server-scored quiz that cuts to the top 150 and then 75, an LLM repo scorer with a four-band rubric, and a QR hunt.",
-    stack: ["Next.js", "GSAP", "Hono", "Firebase"],
-    facts: [
-      { value: "150", label: "then 75: the two quiz cuts" },
-      { value: "10 s", label: "per question, scored server-side" },
-    ],
-    live: "https://quiz.gdgkiit.in",
-    credit: "Built for GDG on Campus KIIT. The repo scorer was built with a collaborator.",
-    // TODO(atif): state your role in the chapter.
-  },
-  {
-    slug: "eazybaritone",
-    order: 6,
-    name: "EazyBaritone",
-    kind: "Game tooling",
-    oneLiner: "Baritone, ported to Minecraft 26.2 with an in-game menu and build previews.",
-    summary:
-      "About 250 API call sites updated for the new version, plus a selection wand, ghost copy and paste preview, input macros and a searchable settings editor.",
-    stack: ["Java", "Fabric", "Gradle"],
-    facts: [{ value: "~250", label: "API call sites ported" }],
-    source: "https://github.com/SigniorAtif/eazybaritone",
-    credit: "A fork of Baritone (LGPL v3). The pathfinding core is upstream work.",
+    // Co-founded; the frontend is my own work. The repo is private, so there is no source link.
   },
   {
     slug: "quexchange",
-    order: 7,
+    order: 5,
     name: "QuExchange",
     kind: "Experiment",
     oneLiner: "Send a file between devices as a deck of QR frames. No network at all.",
@@ -129,10 +101,11 @@ export const projects: Project[] = [
     facts: [],
     live: "https://quexchange.vercel.app",
     source: "https://github.com/SigniorAtif/quexchange",
+    media: "/work/quexchange.webp",
   },
   {
     slug: "rury",
-    order: 8,
+    order: 6,
     name: "rury",
     kind: "Desktop",
     oneLiner: "The Quickshell desktop for Hyprland I work in every day.",

@@ -15,6 +15,8 @@ type TextProps = {
   children: ReactNode;
   /** Seconds to wait after the block enters view. */
   delay?: number;
+  /** Share of the viewport height the block's top must cross (0 = top). Defaults to the house value. */
+  at?: number;
 };
 
 type RiseProps = TextProps & {
@@ -26,7 +28,7 @@ type RiseProps = TextProps & {
 };
 
 /** Headings: words rise through line masks with a slight rotation. No opacity. */
-export function Rise({ as: Tag = "div", className, children, delay = 0, aria = "auto" }: RiseProps) {
+export function Rise({ as: Tag = "div", className, children, delay = 0, at, aria = "auto" }: RiseProps) {
   const ref = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -47,7 +49,7 @@ export function Rise({ as: Tag = "div", className, children, delay = 0, aria = "
             ease: EASE.out,
             stagger: staggerFor(split.words.length, STAGGER.word),
             delay,
-            scrollTrigger: inView(el),
+            scrollTrigger: inView(el, at),
           }),
       });
     },
@@ -62,7 +64,7 @@ export function Rise({ as: Tag = "div", className, children, delay = 0, aria = "
 }
 
 /** Body copy: each line slides up out of its own mask. */
-export function Lines({ as: Tag = "div", className, children, delay = 0 }: TextProps) {
+export function Lines({ as: Tag = "div", className, children, delay = 0, at }: TextProps) {
   const ref = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -83,7 +85,7 @@ export function Lines({ as: Tag = "div", className, children, delay = 0 }: TextP
             ease: EASE.out,
             stagger: staggerFor(split.lines.length, STAGGER.line),
             delay,
-            scrollTrigger: inView(el),
+            scrollTrigger: inView(el, at),
           }),
       });
     },

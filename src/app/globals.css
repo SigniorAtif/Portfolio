@@ -164,6 +164,661 @@ body {
   }
 }
 
+/* ---------- dot material helpers ---------- */
+/* A plate of faint dots: stands in wherever media is missing or not chosen yet. */
+.dot-plate {
+  background-color: var(--panel);
+  background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1.5px);
+  background-size: 10px 10px;
+  background-position: 50% 50%;
+}
+/* Text drawn in dots, like the portrait. Needs a heavy weight to stay readable. */
+.dot-ink {
+  background-image: radial-gradient(circle, var(--dot) 0.9px, transparent 1.3px);
+  background-size: 3.5px 3.5px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- reel ---------- */
+/* Before the script takes over (and under reduced motion) the stage simply
+   fills its tile. The takeover sizes it to the viewport and writes transform
+   and clip-path every frame. */
+.reel-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--ground);
+}
+.reel-stage[data-takeover] {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  border-radius: 0;
+  transform-origin: 50% 50%;
+  will-change: transform, clip-path;
+}
+
+/* ---------- work deck ---------- */
+.deck-stage {
+  --card-w: 120px;
+  --card-h: 212px;
+  perspective: 1400px;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+@media (min-width: 640px) {
+  .deck-stage {
+    --card-w: 168px;
+    --card-h: 298px;
+  }
+}
+.deck-stage[data-dragging="true"] {
+  cursor: grabbing;
+}
+.deck-wheel {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+}
+.deck-card {
+  position: absolute;
+  left: calc(var(--card-w) / -2);
+  top: calc(var(--card-h) / -2);
+  width: var(--card-w);
+  height: var(--card-h);
+  visibility: hidden;
+  transform-style: preserve-3d;
+  will-change: transform;
+  border-radius: 14px;
+  -webkit-user-drag: none;
+}
+.deck-face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  backface-visibility: hidden;
+  transition: border-color var(--dur-ui) var(--ease-out);
+}
+.deck-back {
+  transform: rotateY(180deg);
+}
+.deck-card[data-focused="true"] .deck-front {
+  border-color: var(--ink);
+}
+.deck-media {
+  transform: scale(1.08);
+  transition: transform 0.9s var(--ease-out);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-media {
+  transform: scale(1);
+}
+/* Hover: a frame draws itself round the card and a label bar wipes in along the bottom. */
+.deck-frame {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--done);
+  border-radius: 20px;
+  box-shadow: 0 30px 60px -24px var(--done);
+  opacity: 0.95;
+  clip-path: inset(0 100% 0 0 round 20px);
+  backface-visibility: hidden;
+  pointer-events: none;
+  transition: clip-path 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.deck-label {
+  position: absolute;
+  inset: auto 7px 7px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  background: var(--done);
+  color: var(--ground);
+  clip-path: inset(0 100% 0 0 round 9px);
+  transition: clip-path 0.5s cubic-bezier(0.22, 1, 0.36, 1) 50ms;
+}
+.deck-label b {
+  flex: none;
+  font-family: var(--font-code), monospace;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.deck-label span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-label i {
+  flex: none;
+  font-size: 13px;
+  font-style: normal;
+  transform: translate(-6px, 6px);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s;
+}
+.deck-caption {
+  transition: opacity 0.3s;
+}
+.deck-card:is([data-hover], :focus-visible) .deck-frame {
+  clip-path: inset(0 round 20px);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-label {
+  clip-path: inset(0 round 9px);
+}
+.deck-card:is([data-hover], :focus-visible) .deck-label i {
+  transform: none;
+}
+.deck-card:is([data-hover], :focus-visible) .deck-caption {
+  opacity: 0;
+}
+/* The word that rides with the pointer while it is on a card. */
+.deck-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  margin: 14px 0 0 14px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--font-code), monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  scale: 0.7;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    scale 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.deck-cursor[data-on] {
+  opacity: 1;
+  scale: 1;
+}
+@media (pointer: coarse) {
+  .deck-cursor {
+    display: none;
+  }
+}
+
+/* ---------- work opening ---------- */
+.work-intro {
+  --box-top: clamp(84px, 14svh, 128px);
+  --box-bottom: clamp(132px, 21svh, 188px);
+}
+/* Waiting over the reel: see-through, and out of the way of the video's own controls. */
+.work-intro[data-phase="idle"] {
+  pointer-events: none;
+}
+/* A sheet of ground with a hole the shape of the grown video. */
+.work-curtain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.work-curtain > div {
+  position: absolute;
+  inset: var(--gutter);
+  border-radius: 20px;
+  box-shadow: 0 0 0 200vmax var(--ground);
+}
+/* The frame, at its final place. The script scales it up to cover the screen
+   and lets it close. */
+.work-scene {
+  position: absolute;
+  inset: var(--box-top) var(--gutter) var(--box-bottom);
+  overflow: hidden;
+  border-radius: 28px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  container-type: size;
+}
+/* Cards are sized from the frame: the lifted top card is a little over half its height. */
+.work-scene .deck-stage {
+  --card-h: clamp(150px, 42cqh, 320px);
+  --card-w: calc(var(--card-h) * 0.5625);
+}
+.work-scene[data-backdrop="stars"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s linear;
+}
+.work-scene[data-backdrop="stars"][data-framed="true"]::after {
+  opacity: 1;
+}
+.work-layer {
+  opacity: 0;
+  transition: opacity 0.6s linear;
+}
+.work-layer[data-on="true"] {
+  opacity: 1;
+}
+.work-clouds {
+  position: absolute;
+  left: 50%;
+  bottom: -9%;
+  width: max(104%, 880px);
+  aspect-ratio: 3 / 1;
+  margin-left: calc(max(104%, 880px) / -2);
+  pointer-events: none;
+  will-change: transform;
+}
+.work-clouds img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Depth: the backdrop gets more contrast and a dark tint, a little heavier at the edges.
+   Both sit behind the cards and the front clouds, which stay untouched. */
+.work-scene[data-backdrop="day"] .work-layer:is(img),
+.work-scene[data-backdrop="night"] .work-layer:is(img) {
+  filter: contrast(1.14) saturate(1.05);
+}
+.work-clouds .work-layer:is(img) {
+  filter: none !important;
+}
+.work-haze {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 50% 42%, transparent 35%, rgb(0 0 0 / 0.3) 100%),
+    rgb(0 0 0 / 0.26);
+}
+.work-scene[data-backdrop="stars"] .work-haze {
+  display: none;
+}
+/* Cards sit on a picture here, not on the ground, so they lose the hairline. */
+.work-scene .deck-face {
+  border-color: transparent;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.55);
+}
+.work-veil {
+  position: absolute;
+  inset: var(--gutter);
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--panel);
+  will-change: clip-path;
+}
+/* One word of text that swaps in place: a window the word slides through. */
+.swap-word {
+  display: inline-block;
+  overflow: clip;
+  padding-block: 0.16em;
+  margin-block: -0.16em;
+  vertical-align: top;
+}
+
+/* The card that follows the pointer over the project list. */
+.work-peek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  width: clamp(280px, 26vw, 400px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+}
+
+/* ---------- myself: the picture and the toons ---------- */
+/* The picture's size and its place on screen while it holds. The toons are
+   fixed to the viewport and stand round that place, so both read these. */
+.myself {
+  --myself-gap: clamp(32px, 5vw, 80px);
+  --tile-ratio: 16 / 10; /* wider than the photo, which is cut from the bottom */
+  --tile-w: min(100vw - var(--gutter) * 2, 440px);
+  --tile-h: calc(var(--tile-w) / (var(--tile-ratio)));
+  --tile-x: calc(100vw - var(--gutter) - var(--tile-w)); /* left edge */
+  --tile-tilt: -2deg;
+  --tile-y: 36svh; /* top edge the toons are laid out round; ToonStage carries them to the real one */
+}
+.myself-tile {
+  width: var(--tile-w);
+  aspect-ratio: var(--tile-ratio);
+  justify-self: end;
+  rotate: var(--tile-tilt); /* pinned up a little crooked */
+}
+@media (min-width: 1024px) {
+  .myself {
+    --col: calc((100vw - var(--gutter) * 2 - var(--myself-gap)) / 2.5);
+    /* Kept to the left of its column: the dino stands in the room on the right. */
+    --tile-w: min(var(--col) * 0.74, 42svh * (var(--tile-ratio)));
+    --tile-x: calc(100vw - var(--gutter) - var(--tile-w) * 1.3);
+    --tile-tilt: -3deg;
+    --tile-y: calc(52svh - var(--tile-h) / 2); /* top edge, where it holds */
+  }
+  .myself-tile {
+    position: sticky;
+    top: var(--tile-y);
+    justify-self: start;
+    margin-left: calc(var(--tile-x) - (100vw - var(--gutter) - var(--col)));
+    align-self: start;
+  }
+}
+
+/* Fixed to the viewport and shown by ToonStage while its section is on screen.
+   Every toon is placed from the stage's BOTTOM edge. While the footer rises,
+   FooterCurtain moves <main> with a transform, which makes <main> the box this
+   stage fills; its bottom edge is still the viewport's, its top edge is not. */
+.toon-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Carried up and down with the picture by ToonStage. */
+.toon-follow {
+  position: absolute;
+  inset: 0;
+}
+.toon {
+  position: absolute;
+  left: var(--x);
+  bottom: calc(100svh - var(--y) - var(--w) * var(--shape));
+  width: var(--w);
+  --shape: 0.75; /* canvas height over width */
+}
+.toon-held {
+  position: absolute;
+  top: var(--tile-y);
+}
+/* Narrow: the astronaut and his mug float off the picture's top right corner, over the
+   plate's empty dots, and the dino dances under its bottom right one. */
+.toon-astronaut {
+  --w: calc(var(--tile-w) * 0.56);
+  --x: calc(var(--tile-x) + var(--tile-w) * 0.56);
+  --y: calc(var(--tile-y) - var(--tile-w) * 0.14);
+}
+.toon-mug {
+  --shape: 1;
+  --w: calc(var(--tile-w) * 0.1);
+  --x: calc(var(--tile-x) + var(--tile-w) * 0.5);
+  --y: calc(var(--tile-y) - var(--tile-w) * 0.06);
+}
+.toon-dino {
+  --w: calc(var(--tile-w) * 0.6);
+  --x: calc(var(--tile-x) + var(--tile-w) * 0.46);
+  --y: calc(var(--tile-y) + var(--tile-h) + var(--tile-w) * 0.02);
+}
+/* The saucer only comes where there is room for it. */
+.toon-ufo {
+  display: none;
+}
+@media (min-width: 1024px) {
+  /* Floating off the picture's top right corner, above the photo and clear of the face. */
+  .toon-astronaut {
+    --w: calc(var(--tile-w) * 0.8);
+    --x: calc(var(--tile-x) + var(--tile-w) * 0.52);
+    --y: calc(var(--tile-y) - var(--tile-w) * 0.6);
+  }
+  /* His mug, adrift above the top edge. */
+  .toon-mug {
+    --w: calc(var(--tile-w) * 0.13);
+    --x: calc(var(--tile-x) + var(--tile-w) * 0.3);
+    --y: calc(var(--tile-y) - var(--tile-w) * 0.26);
+  }
+  /* The dino dances on the picture's floor line, at its right, facing in. */
+  .toon-dino {
+    --w: calc(var(--tile-w) * 0.7);
+    --x: calc(var(--tile-x) + var(--tile-w) * 0.8);
+    --y: calc(var(--tile-y) + var(--tile-h) - var(--tile-w) * 0.47);
+  }
+  /* The saucer hovers up at the picture's left, near the middle of the page, between it and the words. */
+  .toon-ufo {
+    display: block;
+    --shape: 1.25;
+    --w: calc(var(--tile-w) * 0.56);
+    --x: calc(var(--tile-x) - var(--tile-w) * 0.42);
+    --y: calc(var(--tile-y) - var(--tile-w) * 0.46);
+  }
+}
+/* The beam thins out into nothing instead of stopping at the canvas's edge, and not
+   evenly: its middle reaches further than its sides, and it dims in steps, not a ramp. */
+.toon-ufo canvas {
+  mask-image:
+    radial-gradient(ellipse 44% 84% at 46% 22%, #000 45%, transparent 100%),
+    linear-gradient(to bottom, #000 34%, rgb(0 0 0 / 0.7) 50%, rgb(0 0 0 / 0.55) 64%, rgb(0 0 0 / 0.2) 84%, transparent 100%);
+  mask-composite: intersect;
+}
+/* The dino and the button over his head, kept together. */
+.toon-flip {
+  position: relative;
+}
+/* The easter egg: an unmarked button over the dino's head. */
+.toon-dino-head {
+  position: absolute;
+  left: 30%;
+  top: 4%;
+  width: 46%;
+  height: 52%;
+  border-radius: 40%;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* ---------- outro: the travelling quote ---------- */
+/* Scroll length only; Outro sets the real height from the quote's width. */
+.outro {
+  height: 400svh;
+}
+.outro-plain {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Above FooterCurtain's veil (10), below the footer (20). */
+.outro-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.outro-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate3d(100vw, -50%, 0);
+  transform-origin: 0 50%;
+  white-space: nowrap;
+  font-size: 14vw;
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  will-change: transform;
+}
+@media (min-width: 640px) {
+  .outro-line {
+    font-size: 12vw;
+  }
+}
+
+/* ---------- site mark ---------- */
+/* The name, fixed in the top-left corner. It sits exactly where the hero's
+   gutter and top padding put it, so the bar's own padding is pulled back out. */
+.site-mark {
+  --pad-x: 12px;
+  --pad-y: 10px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  padding: calc(24px - var(--pad-y)) calc(var(--gutter) - var(--pad-x));
+  pointer-events: none;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s;
+}
+.site-mark[data-state="gone"] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s var(--dur-ui);
+}
+.site-mark-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  padding: var(--pad-y) var(--pad-x);
+  border-radius: 16px;
+  pointer-events: auto;
+  transition: transform 0.6s var(--ease-out);
+}
+/* The chip: frosted ground behind the bar, only once the hero is gone. */
+.site-mark-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ground) 58%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s var(--dur-ui);
+}
+.site-mark[data-state="mark"] .site-mark-bar::before {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s;
+}
+.site-mark-name {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+/* A run of text that folds away sideways: a grid column from 1fr to 0fr. */
+.site-mark-fold {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  transition:
+    grid-template-columns 0.6s var(--ease-out),
+    opacity 0.35s var(--ease-out);
+}
+.site-mark-fold > * {
+  min-width: 0;
+  overflow-x: clip;
+  white-space: nowrap;
+}
+.site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name .site-mark-fold,
+.site-mark:not([data-state="full"], [data-open="true"]) .site-mark-links {
+  grid-template-columns: 0fr;
+  opacity: 0;
+}
+.site-mark:not([data-state="full"], [data-open="true"]) .site-mark-links {
+  visibility: hidden;
+  transition:
+    grid-template-columns 0.6s var(--ease-out),
+    opacity 0.35s var(--ease-out),
+    visibility 0s 0.6s;
+}
+.site-mark-links > div {
+  display: flex;
+  gap: 20px;
+  /* The gap from the name is the invisible first item, so the folded column
+     reaches zero width (padding or a margin here would hold it open). */
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.site-mark-links > div::before {
+  content: "";
+}
+.site-mark-links a {
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.site-mark-links a:is(:hover, :focus-visible) {
+  color: var(--ink);
+}
+/* Unfolded past the hero: the whole page behind the bar blurs and sinks
+   towards the ground colour, so the name and links are all there is to read. */
+.site-mark-frost {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--ground) 45%, transparent);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s var(--ease-out),
+    visibility 0s 0.45s;
+}
+.site-mark[data-state="mark"][data-open="true"] .site-mark-frost {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.45s var(--ease-out),
+    visibility 0s;
+}
+@media (max-width: 639px) {
+  .site-mark-name {
+    font-size: 22px;
+  }
+  .site-mark-links > div {
+    gap: 14px;
+    font-size: 16px;
+  }
+  /* The gutter is narrower than the chip's padding wants: nudge the chip in. */
+  .site-mark[data-state="mark"] .site-mark-bar {
+    transform: translateX(6px);
+  }
+}
+
 /* ---------- footer ---------- */
 /* The name, stretched tall from its base. The wrapper's top padding makes room for the stretch. */
 .footmark {
@@ -183,7 +838,8 @@ body {
   line-height: 0.7;
   letter-spacing: -0.025em;
   white-space: nowrap;
-  transform: scaleY(var(--stretch));
+  /* Sunk a little below the footer's bottom edge. */
+  transform: translateY(0.06em) scaleY(var(--stretch));
   transform-origin: 50% 100%;
 }
 .footmark-in span {
@@ -200,7 +856,42 @@ body {
     animation: none !important;
   }
   .swap-in,
-  .arrow {
+  .arrow,
+  .deck-media,
+  .site-mark,
+  .site-mark *,
+  .site-mark-bar::before {
+    transition: none !important;
+  }
+  .deck-media {
+    transform: none;
+  }
+  .deck-frame,
+  .deck-label,
+  .deck-label i {
     transition: none;
+  }
+  /* The toons stand in their section as still drawings. */
+  .toon-stage {
+    position: absolute;
+    visibility: visible;
+  }
+  /* The quote is plain text in the page. */
+  .outro {
+    height: auto;
+    padding-block: 22svh;
+  }
+  .outro-plain {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    max-width: 18ch;
+    font-size: clamp(36px, 5.2vw, 76px);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
   }
 }
