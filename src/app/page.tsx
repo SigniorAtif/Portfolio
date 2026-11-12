@@ -4,6 +4,7 @@ import { Hero } from "@/components/hero/Hero";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { SiteMark } from "@/components/nav/SiteMark";
 import { Reel } from "@/components/reel/Reel";
+import { Work } from "@/components/work/Work";
 import { reel } from "@/content/reel";
 
 export default function Home() {
@@ -13,8 +14,7 @@ export default function Home() {
       <main>
         <Hero />
         {reel.enabled && <Reel />}
-        {/* Work and Myself land here next. */}
-        <div id="work" className="h-[60svh]" />
+        <Work />
       </main>
       <FooterCurtain />
       <Footer />
