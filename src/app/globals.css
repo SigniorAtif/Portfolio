@@ -164,6 +164,150 @@ body {
   }
 }
 
+/* ---------- site mark ---------- */
+/* The name, fixed in the top-left corner. It sits exactly where the hero's
+   gutter and top padding put it, so the bar's own padding is pulled back out. */
+.site-mark {
+  --pad-x: 12px;
+  --pad-y: 10px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  padding: calc(24px - var(--pad-y)) calc(var(--gutter) - var(--pad-x));
+  pointer-events: none;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s;
+}
+.site-mark[data-state="gone"] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s var(--dur-ui);
+}
+.site-mark-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  padding: var(--pad-y) var(--pad-x);
+  border-radius: 16px;
+  pointer-events: auto;
+  transition: transform 0.6s var(--ease-out);
+}
+/* The chip: frosted ground behind the bar, only once the hero is gone. */
+.site-mark-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--ground) 58%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s var(--dur-ui);
+}
+.site-mark[data-state="mark"] .site-mark-bar::before {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    visibility 0s;
+}
+.site-mark-name {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+/* A run of text that folds away sideways: a grid column from 1fr to 0fr. */
+.site-mark-fold {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  transition:
+    grid-template-columns 0.6s var(--ease-out),
+    opacity 0.35s var(--ease-out);
+}
+.site-mark-fold > * {
+  min-width: 0;
+  overflow-x: clip;
+  white-space: nowrap;
+}
+.site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name .site-mark-fold,
+.site-mark:not([data-state="full"], [data-open="true"]) .site-mark-links {
+  grid-template-columns: 0fr;
+  opacity: 0;
+}
+.site-mark:not([data-state="full"], [data-open="true"]) .site-mark-links {
+  visibility: hidden;
+  transition:
+    grid-template-columns 0.6s var(--ease-out),
+    opacity 0.35s var(--ease-out),
+    visibility 0s 0.6s;
+}
+.site-mark-links > div {
+  display: flex;
+  gap: 20px;
+  /* The gap from the name is the invisible first item, so the folded column
+     reaches zero width (padding or a margin here would hold it open). */
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.site-mark-links > div::before {
+  content: "";
+}
+.site-mark-links a {
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.site-mark-links a:is(:hover, :focus-visible) {
+  color: var(--ink);
+}
+/* Unfolded past the hero: the whole page behind the bar blurs and sinks
+   towards the ground colour, so the name and links are all there is to read. */
+.site-mark-frost {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--ground) 45%, transparent);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.45s var(--ease-out),
+    visibility 0s 0.45s;
+}
+.site-mark[data-state="mark"][data-open="true"] .site-mark-frost {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.45s var(--ease-out),
+    visibility 0s;
+}
+@media (max-width: 639px) {
+  .site-mark-name {
+    font-size: 22px;
+  }
+  .site-mark-links > div {
+    gap: 14px;
+    font-size: 16px;
+  }
+  /* The gutter is narrower than the chip's padding wants: nudge the chip in. */
+  .site-mark[data-state="mark"] .site-mark-bar {
+    transform: translateX(6px);
+  }
+}
+
 /* ---------- footer ---------- */
 /* The name, stretched tall from its base. The wrapper's top padding makes room for the stretch. */
 .footmark {
@@ -201,7 +345,10 @@ body {
     animation: none !important;
   }
   .swap-in,
-  .arrow {
-    transition: none;
+  .arrow,
+  .site-mark,
+  .site-mark *,
+  .site-mark-bar::before {
+    transition: none !important;
   }
 }
