@@ -496,6 +496,47 @@ body {
   pointer-events: none;
 }
 
+/* ---------- outro: the travelling quote ---------- */
+/* Scroll length only; Outro sets the real height from the quote's width. */
+.outro {
+  height: 400svh;
+}
+.outro-plain {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Above FooterCurtain's veil (10), below the footer (20). */
+.outro-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.outro-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate3d(100vw, -50%, 0);
+  transform-origin: 0 50%;
+  white-space: nowrap;
+  font-size: 14vw;
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  will-change: transform;
+}
+@media (min-width: 640px) {
+  .outro-line {
+    font-size: 12vw;
+  }
+}
+
 /* ---------- site mark ---------- */
 /* The name, fixed in the top-left corner. It sits exactly where the hero's
    gutter and top padding put it, so the bar's own padding is pulled back out. */
@@ -691,5 +732,23 @@ body {
   .deck-label,
   .deck-label i {
     transition: none;
+  }
+  /* The quote is plain text in the page. */
+  .outro {
+    height: auto;
+    padding-block: 22svh;
+  }
+  .outro-plain {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    max-width: 18ch;
+    font-size: clamp(36px, 5.2vw, 76px);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
   }
 }
