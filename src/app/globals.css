@@ -363,6 +363,139 @@ body {
   }
 }
 
+/* ---------- work opening ---------- */
+.work-intro {
+  --box-top: clamp(84px, 14svh, 128px);
+  --box-bottom: clamp(132px, 21svh, 188px);
+}
+/* Waiting over the reel: see-through, and out of the way of the video's own controls. */
+.work-intro[data-phase="idle"] {
+  pointer-events: none;
+}
+/* A sheet of ground with a hole the shape of the grown video. */
+.work-curtain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.work-curtain > div {
+  position: absolute;
+  inset: var(--gutter);
+  border-radius: 20px;
+  box-shadow: 0 0 0 200vmax var(--ground);
+}
+/* The frame, at its final place. The script scales it up to cover the screen
+   and lets it close. */
+.work-scene {
+  position: absolute;
+  inset: var(--box-top) var(--gutter) var(--box-bottom);
+  overflow: hidden;
+  border-radius: 28px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  container-type: size;
+}
+/* Cards are sized from the frame: the lifted top card is a little over half its height. */
+.work-scene .deck-stage {
+  --card-h: clamp(150px, 42cqh, 320px);
+  --card-w: calc(var(--card-h) * 0.5625);
+}
+.work-scene[data-backdrop="stars"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s linear;
+}
+.work-scene[data-backdrop="stars"][data-framed="true"]::after {
+  opacity: 1;
+}
+.work-layer {
+  opacity: 0;
+  transition: opacity 0.6s linear;
+}
+.work-layer[data-on="true"] {
+  opacity: 1;
+}
+.work-clouds {
+  position: absolute;
+  left: 50%;
+  bottom: -9%;
+  width: max(104%, 880px);
+  aspect-ratio: 3 / 1;
+  margin-left: calc(max(104%, 880px) / -2);
+  pointer-events: none;
+  will-change: transform;
+}
+.work-clouds img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Depth: the backdrop gets more contrast and a dark tint, a little heavier at the edges.
+   Both sit behind the cards and the front clouds, which stay untouched. */
+.work-scene[data-backdrop="day"] .work-layer:is(img),
+.work-scene[data-backdrop="night"] .work-layer:is(img) {
+  filter: contrast(1.14) saturate(1.05);
+}
+.work-clouds .work-layer:is(img) {
+  filter: none !important;
+}
+.work-haze {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 50% 42%, transparent 35%, rgb(0 0 0 / 0.3) 100%),
+    rgb(0 0 0 / 0.26);
+}
+.work-scene[data-backdrop="stars"] .work-haze {
+  display: none;
+}
+/* Cards sit on a picture here, not on the ground, so they lose the hairline. */
+.work-scene .deck-face {
+  border-color: transparent;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.55);
+}
+.work-veil {
+  position: absolute;
+  inset: var(--gutter);
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--panel);
+  will-change: clip-path;
+}
+/* One word of text that swaps in place: a window the word slides through. */
+.swap-word {
+  display: inline-block;
+  overflow: clip;
+  padding-block: 0.16em;
+  margin-block: -0.16em;
+  vertical-align: top;
+}
+
+/* The card that follows the pointer over the project list. */
+.work-peek {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  width: clamp(280px, 26vw, 400px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+}
+
 /* ---------- site mark ---------- */
 /* The name, fixed in the top-left corner. It sits exactly where the hero's
    gutter and top padding put it, so the bar's own padding is pulled back out. */
