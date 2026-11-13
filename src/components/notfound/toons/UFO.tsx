@@ -54,10 +54,20 @@ export function UfoSvg({ ref, viewBox = "2 -4 96 72", textured = false }: UfoSvg
   );
 }
 
+/**
+ * The saucer as the site shows it: a frame 120 units tall instead of 72, so more of the
+ * beam is in it, and the ship shaded so it has some texture. Draw it on 90 rows, not 54.
+ */
+export function LongBeamUfoSvg(props: ToonSvgProps) {
+  return <UfoSvg {...props} viewBox="2 -4 96 120" textured />;
+}
+
 export const ufo: Toon = {
   id: "ufo",
   label: "A small alien in a flying saucer, drifting about and swinging its light beam.",
-  Svg: UfoSvg,
+  Svg: LongBeamUfoSvg,
+  rows: 90,
+  grain: 0.45,
   animate(svg, tl) {
     const trish = part(svg, "trish");
     const ship = part(svg, "ship");

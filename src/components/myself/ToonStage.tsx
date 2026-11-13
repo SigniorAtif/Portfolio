@@ -5,17 +5,10 @@ import { AsciiDrawing } from "@/components/notfound/AsciiToon";
 import { AstronautSvg, animateAstronaut } from "@/components/notfound/toons/Astronaut";
 import { CoffeeMugSvg } from "@/components/notfound/toons/CoffeeMug";
 import { DINO_SONGS, DinoSvg, animateDino, randomDinoMood } from "@/components/notfound/toons/Dino";
-import { UfoSvg, ufo } from "@/components/notfound/toons/UFO";
-import type { ToonSvgProps } from "@/components/notfound/toons/types";
+import { LongBeamUfoSvg, ufo } from "@/components/notfound/toons/UFO";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 
 const random = gsap.utils.random;
-
-// The saucer with a longer beam than the 404's: a frame 120 units tall instead of 72,
-// so the glyph grid below is 90 rows instead of 54. Its ship is shaded so it has some texture.
-function LongBeamUfoSvg(props: ToonSvgProps) {
-  return <UfoSvg {...props} viewBox="2 -4 96 120" textured />;
-}
 
 // The dino's song for this visit, picked the first time he is drawn. It sets
 // his beat and his face, and the click on his head opens it.

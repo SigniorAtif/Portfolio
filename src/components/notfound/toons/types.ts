@@ -14,6 +14,10 @@ export type Toon = {
   /** Read out in place of the drawing. */
   label: string;
   Svg: (props: ToonSvgProps) => JSX.Element;
+  /** Glyph rows, when the drawing's frame is not the usual 4:3 (54 rows). */
+  rows?: number;
+  /** Breaks soft gradients into scattered dots; see the renderer. */
+  grain?: number;
   /** Fills a paused timeline with the looping animation. Look parts up inside `svg`. */
   animate: (svg: SVGSVGElement, tl: gsap.core.Timeline) => void;
 };

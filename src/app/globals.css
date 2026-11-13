@@ -612,7 +612,8 @@ body {
 }
 /* The beam thins out into nothing instead of stopping at the canvas's edge, and not
    evenly: its middle reaches further than its sides, and it dims in steps, not a ramp. */
-.toon-ufo canvas {
+.toon-ufo canvas,
+.ascii-ufo canvas {
   mask-image:
     radial-gradient(ellipse 44% 84% at 46% 22%, #000 45%, transparent 100%),
     linear-gradient(to bottom, #000 34%, rgb(0 0 0 / 0.7) 50%, rgb(0 0 0 / 0.55) 64%, rgb(0 0 0 / 0.2) 84%, transparent 100%);
