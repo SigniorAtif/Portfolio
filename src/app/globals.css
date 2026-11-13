@@ -530,6 +530,11 @@ body {
     margin-left: calc(var(--tile-x) - (100vw - var(--gutter) - var(--col)));
     align-self: start;
   }
+  /* Slowed down (see Myself), the picture lags behind the text instead of holding. */
+  .myself[data-pace] .myself-tile {
+    position: relative;
+    top: auto;
+  }
 }
 
 /* Fixed to the viewport and shown by ToonStage while its section is on screen.
