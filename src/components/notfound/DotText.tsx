@@ -96,7 +96,11 @@ export function DotText({ text, className, weight = 700 }: Props) {
         for (let x = step / 2; x < width; x += step) {
           const jx = x + (random() - 0.5) * step * 0.7;
           const jy = y + (random() - 0.5) * step * 0.7;
-          if (pixels[(Math.round(jy) * width + Math.round(jx)) * 4 + 3] < 128) continue;
+          // The jitter can push a point past the edge, where there is no pixel to read.
+          const px = Math.round(jx);
+          const py = Math.round(jy);
+          if (px < 0 || py < 0 || px >= width || py >= height) continue;
+          if (pixels[(py * width + px) * 4 + 3] < 128) continue;
           const r2 = random();
           dots.push({ x: jx, y: jy, r: random(), r2, size: 0.55 + r2 ** 3 * 1.5, loose: random() < LOOSE_SHARE });
         }
