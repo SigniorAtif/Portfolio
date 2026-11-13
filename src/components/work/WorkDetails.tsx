@@ -32,6 +32,8 @@ export function WorkDetails({ projects, focused }: { projects: Project[]; focuse
     () => false,
   );
   const [hot, setHot] = useState<Project | null>(null);
+  // Row under the mouse or holding keyboard focus; the highlight goes back to the wheel's card without one.
+  const [pointed, setPointed] = useState<number | null>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const followX = useSpring(x, SPRING);
@@ -52,57 +54,99 @@ export function WorkDetails({ projects, focused }: { projects: Project[]; focuse
     }
   };
 
+  const lit = pointed ?? focused;
+
   return (
     <MotionConfig reducedMotion="user">
-      <ol className="border-t border-line" onPointerMove={place} onPointerLeave={() => setHot(null)}>
-        {projects.map((project, i) => {
-          const href = project.live ?? project.source;
-          return (
-            <li
-              key={project.slug}
-              id={`project-${project.slug}`}
-              onPointerEnter={(event) => {
-                if (event.pointerType !== "mouse") return;
-                // The card opens where the pointer is, not where it last was.
-                if (!hot) place(event, true);
-                setHot(project);
-              }}
-              className="relative isolate grid scroll-mt-24 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 border-b border-line py-4 sm:grid-cols-[3rem_minmax(0,14rem)_minmax(0,1fr)_auto]"
-            >
-              {i === focused && (
-                // One highlight that slides from row to row as the wheel turns.
-                <motion.span
-                  layoutId="work-row"
-                  aria-hidden="true"
-                  className="absolute inset-x-[calc(var(--gutter)*-0.5)] inset-y-0 -z-10 rounded-[14px] bg-panel"
-                  transition={{ type: "spring", stiffness: 380, damping: 36 }}
-                />
-              )}
-              <span className="kicker">{number(project)}</span>
-              <span className="text-[19px] font-medium tracking-[-0.02em]">{project.name}</span>
-              <span className="text-body max-sm:col-span-2 max-sm:col-start-2 max-sm:row-start-2">{project.oneLiner}</span>
-              {href ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${project.name}: ${project.live ? "open the live site" : "view the source"}`}
-                  className="link-line font-mono text-[12px] uppercase tracking-[0.12em] text-muted hover:text-ink max-sm:col-start-3 max-sm:row-start-1"
-                >
-                  <SwapLabel>{project.live ? "Live" : "Source"}</SwapLabel>
-                  <span aria-hidden="true" className="arrow">
-                    ↗
-                  </span>
-                </a>
-              ) : (
-                <span className="font-mono text-[12px] uppercase tracking-[0.12em] text-line-strong max-sm:col-start-3 max-sm:row-start-1">
-                  Private
+      {/* One grid for the header and every row (each is a subgrid), so the columns line up down the list. */}
+      <div
+        className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-6 lg:grid-cols-[3rem_minmax(0,15rem)_minmax(0,1fr)_auto_auto]"
+        onPointerMove={place}
+        onPointerLeave={() => {
+          setHot(null);
+          setPointed(null);
+        }}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPointed(null);
+        }}
+      >
+        <div aria-hidden="true" className="col-span-full grid grid-cols-subgrid pb-3 max-sm:hidden">
+          <span className="kicker">No.</span>
+          <span className="kicker">Project</span>
+          <span className="kicker max-lg:hidden">About</span>
+          <span className="kicker max-lg:hidden">Type</span>
+          <span className="kicker justify-self-end">Links</span>
+        </div>
+
+        <ol className="col-span-full grid grid-cols-subgrid border-t border-line">
+          {projects.map((project, i) => {
+            const href = project.live ?? project.source;
+            const on = i === lit;
+            const links = [
+              { href: project.live, label: "Live", says: "open the live site" },
+              { href: project.source, label: "Source", says: "view the source" },
+            ].filter((link): link is { href: string; label: string; says: string } => !!link.href);
+            return (
+              <li
+                key={project.slug}
+                id={`project-${project.slug}`}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== "mouse") return;
+                  // The card opens where the pointer is, not where it last was.
+                  if (!hot) place(event, true);
+                  setHot(project);
+                  setPointed(i);
+                }}
+                onFocus={() => setPointed(i)}
+                className="relative isolate col-span-full grid scroll-mt-24 grid-cols-subgrid items-baseline gap-y-1 border-b border-line py-4 sm:py-5"
+              >
+                {on && (
+                  // One highlight that slides from row to row: the row under the pointer or
+                  // keyboard, else the card on top of the wheel.
+                  <motion.span
+                    layoutId="work-row"
+                    aria-hidden="true"
+                    className="absolute inset-x-[calc(var(--gutter)*-0.5)] inset-y-0 -z-10 rounded-[14px] bg-panel"
+                    transition={{ type: "spring", stiffness: 380, damping: 36 }}
+                  />
+                )}
+                {href && (
+                  // The whole row opens the project for a pointer; keyboards and screen readers use the named links.
+                  <a href={href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true" className="absolute inset-0" />
+                )}
+                <span className={`kicker tabular-nums transition-colors duration-300 ${on ? "!text-ink" : ""}`}>{number(project)}</span>
+                <span className="text-[19px] font-medium leading-tight tracking-[-0.02em] sm:text-[20px]">{project.name}</span>
+                {/* Under the name until there is room for a column of its own. */}
+                <span className={`max-w-[62ch] transition-colors duration-300 max-lg:[grid-column:2/-1] ${on ? "text-body" : "text-muted"}`}>
+                  {project.oneLiner}
                 </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+                <span className="kicker whitespace-nowrap max-lg:hidden">{project.kind}</span>
+                <span className="relative z-10 flex gap-5 font-mono text-[12px] uppercase tracking-[0.12em] max-sm:col-start-2 max-sm:mt-1 sm:justify-self-end sm:max-lg:col-start-3 sm:max-lg:row-start-1">
+                  {links.length ? (
+                    links.map((link) => (
+                      <a
+                        key={link.label}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${project.name}: ${link.says}`}
+                        className="link-line -my-3 inline-flex items-baseline py-3 text-body transition-colors duration-300 hover:text-ink"
+                      >
+                        <SwapLabel>{link.label}</SwapLabel>
+                        <span aria-hidden="true" className="arrow">
+                          ↗
+                        </span>
+                      </a>
+                    ))
+                  ) : (
+                    <span className="text-muted">Private</span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       {fine && !reduced && (
         <AnimatePresence>
