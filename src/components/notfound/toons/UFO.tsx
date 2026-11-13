@@ -65,7 +65,9 @@ export function LongBeamUfoSvg(props: ToonSvgProps) {
 export const ufo: Toon = {
   id: "ufo",
   label: "A small alien in a flying saucer, drifting about and swinging its light beam.",
-  Svg: UfoSvg,
+  Svg: LongBeamUfoSvg,
+  rows: 90,
+  grain: 0.45,
   animate(svg, tl) {
     const trish = part(svg, "trish");
     const ship = part(svg, "ship");

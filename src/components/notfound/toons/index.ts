@@ -26,7 +26,6 @@
  * SOFTWARE.
  */
 
-import { useSyncExternalStore } from "react";
 import { astronaut } from "./Astronaut";
 import { dino } from "./Dino";
 import { ufo } from "./UFO";
@@ -36,23 +35,3 @@ export type { Toon, ToonId };
 
 /** Add the other seven here as they are ported; the renderer needs nothing else. */
 export const toons: Toon[] = [ufo, astronaut, dino];
-
-let picked = -1;
-const noSubscribe = () => () => {};
-
-/**
- * One toon per visit, chosen on the client after hydration (null on the
- * server and during hydration, so the prerendered HTML never depends on a
- * random number).
- */
-export function useToonOfTheVisit(): Toon | null {
-  const index = useSyncExternalStore(
-    noSubscribe,
-    () => {
-      if (picked < 0) picked = Math.floor(Math.random() * toons.length);
-      return picked;
-    },
-    () => -1,
-  );
-  return index < 0 ? null : toons[index];
-}

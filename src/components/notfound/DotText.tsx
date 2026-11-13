@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-const TARGET_DOTS = 1500;
 const RING_PX = 56; // the loader ring the portrait's dots leave from
 const ASSEMBLE_S = 2.6;
 const LOOSE_SHARE = 0.03; // dots that never settle
@@ -25,6 +24,8 @@ type Props = {
   className?: string;
   /** Font weight the text is sampled at. */
   weight?: number;
+  /** About how many dots the text is drawn in. */
+  dots?: number;
 };
 
 /**
@@ -34,7 +35,7 @@ type Props = {
  * settle and keep drifting, so the word looks like it did not finish. The
  * pointer is a light: dots near it brighten. Reduced motion draws it in place.
  */
-export function DotText({ text, className, weight = 700 }: Props) {
+export function DotText({ text, className, weight = 700, dots: target = 1500 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -81,7 +82,9 @@ export function DotText({ text, className, weight = 700 }: Props) {
 
       let lit = 0;
       for (let i = 3; i < pixels.length; i += 4 * 7) if (pixels[i] > 128) lit++;
-      const step = Math.max(2, Math.sqrt((lit * 7) / TARGET_DOTS));
+      // Fewer dots when the text is drawn small, or they pile up into solid shapes.
+      const count = target * Math.min(1, height / 340);
+      const step = Math.max(2, Math.sqrt((lit * 7) / count));
 
       // A fixed generator, so the same text always makes the same dots.
       let seed = 11;
@@ -173,7 +176,7 @@ export function DotText({ text, className, weight = 700 }: Props) {
       sizes.disconnect();
       window.removeEventListener("pointermove", onMove);
     };
-  }, [text, weight]);
+  }, [text, weight, target]);
 
   return (
     <div className={className}>

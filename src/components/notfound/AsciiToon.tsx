@@ -2,19 +2,35 @@
 
 import { useEffect, useRef, type JSX } from "react";
 import { gsap } from "@/lib/gsap";
-import { useToonOfTheVisit } from "./toons";
-import type { ToonSvgProps } from "./toons/types";
+import { toons, type ToonId } from "./toons";
+import { CoffeeMugSvg } from "./toons/CoffeeMug";
+import { LOOP_EASE_IN_OUT, part, type ToonSvgProps } from "./toons/types";
 
 const FPS = 12; // low on purpose: it should feel like stop motion
 const GLYPHS = [" ", "·", "•", "○", "●"]; // dot-like only, so it stays the site's material
 const LIGHT_CELLS = 11; // reach of the pointer's light, in cells
 
-/** The 404's toon: one per visit, as dot-ASCII. */
-export function AsciiToon({ className }: { className?: string }) {
-  const toon = useToonOfTheVisit();
+/** One of the 404's toons, as dot-ASCII, wherever the page puts it. */
+export function AsciiToon({ id, className, sharpness }: { id: ToonId; className?: string; sharpness?: number }) {
+  const toon = toons.find((item) => item.id === id);
+  if (!toon) return null;
   return (
-    <div className={className} role="img" aria-label={toon?.label ?? "A small cartoon character"}>
-      {toon ? <AsciiDrawing Svg={toon.Svg} animate={toon.animate} /> : <div className="aspect-[4/3]" />}
+    <div className={`ascii-${toon.id} ${className ?? ""}`} role="img" aria-label={toon.label}>
+      <AsciiDrawing Svg={toon.Svg} animate={toon.animate} rows={toon.rows} grain={toon.grain} sharpness={sharpness} />
+    </div>
+  );
+}
+
+// The mug has no loop of its own, so it is given a slow tumble to match the astronaut's drift.
+function animateMug(svg: SVGSVGElement, tl: gsap.core.Timeline) {
+  tl.to(part(svg, "coffee"), { rotation: 24, duration: 4, transformOrigin: "50% 50%", ...LOOP_EASE_IN_OUT }, 0);
+}
+
+/** The astronaut's mug, adrift beside him. Decoration only: the astronaut's label covers the pair. */
+export function AsciiMug({ className }: { className?: string }) {
+  return (
+    <div className={className} aria-hidden="true">
+      <AsciiDrawing Svg={CoffeeMugSvg} animate={animateMug} cols={18} rows={18} sharpness={4} />
     </div>
   );
 }
