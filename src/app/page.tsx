@@ -17,7 +17,7 @@ export default function Home() {
         <Hero />
         {reel.enabled && <Reel />}
         <Work />
-        <Myself until="outro" />
+        <Myself />
         <Outro id="outro" />
       </main>
       <FooterCurtain />
