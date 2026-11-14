@@ -773,6 +773,9 @@ body {
 }
 .site-mark-links > div {
   display: flex;
+  /* Without this the empty first item sets the row's baseline at its bottom
+     edge and the links ride above the name's. */
+  align-items: baseline;
   gap: 20px;
   /* The gap from the name is the invisible first item, so the folded column
      reaches zero width (padding or a margin here would hold it open). */
@@ -786,7 +789,7 @@ body {
 .site-mark-links a {
   transition: color var(--dur-hover) var(--ease-hover);
 }
-.site-mark-links a:is(:hover, :focus-visible) {
+.site-mark-links a:is(:hover, :focus-visible, [aria-current="page"]) {
   color: var(--ink);
 }
 /* Unfolded past the hero: the whole page behind the bar blurs and sinks
