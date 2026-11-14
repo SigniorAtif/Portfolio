@@ -35,6 +35,11 @@ export default function NotFound() {
         id="dino"
         className="pointer-events-none absolute bottom-0 right-[-4%] w-[clamp(200px,32vw,520px)]"
       />
+      {/* One more of them, swimming in the bottom left corner. */}
+      <AsciiToon
+        id="shrimp"
+        className="pointer-events-none absolute bottom-[5svh] left-[1%] w-[clamp(170px,25vw,400px)]"
+      />
       <header className="py-6">
         <Link href="/" className="text-[26px] font-semibold tracking-tight">
           {site.name}.
