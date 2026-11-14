@@ -1,6 +1,6 @@
 import type { JSX, Ref } from "react";
 
-export type ToonId = "ufo" | "astronaut" | "dino";
+export type ToonId = "ufo" | "astronaut" | "dino" | "hexo" | "monsier" | "octo" | "potion" | "shapes" | "shrimp";
 
 export type ToonSvgProps = { ref?: Ref<SVGSVGElement> };
 
@@ -37,4 +37,28 @@ export function part(svg: SVGSVGElement, name: string): SVGElement {
   const found = svg.querySelector<SVGElement>(`.${name}`);
   if (!found) throw new Error(`toon part .${name} missing`);
   return found;
+}
+
+/**
+ * Keeps a drawing's SMIL animations (`<animate>`) moving in the dot renderer.
+ * The renderer redraws from a snapshot of the SVG, and a snapshot always shows
+ * SMIL at time zero. So the clock is written into each `begin` as a negative
+ * offset: at time zero the snapshot is then that far into the loop.
+ */
+export function runSmil(svg: SVGSVGElement, tl: gsap.core.Timeline): void {
+  const animations = Array.from(svg.querySelectorAll("animate"));
+  if (!animations.length) return;
+  tl.to(
+    {},
+    {
+      duration: 3600,
+      repeat: -1,
+      ease: "none",
+      onUpdate() {
+        const begin = `-${this.totalTime().toFixed(2)}s`;
+        for (const animation of animations) animation.setAttribute("begin", begin);
+      },
+    },
+    0,
+  );
 }
