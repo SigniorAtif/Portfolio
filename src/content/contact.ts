@@ -6,6 +6,19 @@ export const asks = ["you to build it", "help with the hard part", "a second opi
 /** When they want it. Each one has to end the sentence. */
 export const deadlines = ["this month", "this quarter", "whenever it's right"];
 
+/** A finished note: each blank as written, and the ask and deadline as picked. */
+export type Note = {
+  name: string;
+  thing: string;
+  ask: string;
+  deadline: string;
+  email: string;
+};
+
+/** The note as one sentence. The page shows it back and the mail carries it, so both read the same. */
+export const noteText = (note: Note) =>
+  `Hi Atif, I'm ${note.name}. I'm making ${note.thing}. And I want ${note.ask}, ${note.deadline}. Reach me at ${note.email}.`;
+
 /** Grey examples shown in the empty blanks. */
 export const hints = {
   name: "your name",
