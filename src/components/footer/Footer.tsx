@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { footerNav, site, socials } from "@/content/site";
 import { FooterMark } from "./FooterMark";
@@ -11,7 +12,7 @@ async function currentYear() {
 }
 
 /**
- * Closes the page: a mono rule line, the email as one huge link, the sections
+ * Closes every page: a mono rule line, the email as one huge link, the pages
  * as numbered rows, and the name rising out of the bottom edge. The name is
  * the only thing that animates in; the rest is simply there.
  *
@@ -21,6 +22,19 @@ async function currentYear() {
  * The footer slides up over the held, blurred page (see FooterCurtain), so it
  * has an opaque ground and sits above the curtain's veil.
  */
+/** A footer row: a route change for a page, a plain anchor for a place on this one. */
+function Row({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+  return href.startsWith("/") ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  );
+}
+
 export async function Footer() {
   const year = await currentYear();
   return (
@@ -65,7 +79,7 @@ export async function Footer() {
 
           <nav aria-label="Footer" className="grid content-start self-start border-t border-line-strong">
             {footerNav.map((link, i) => (
-              <a
+              <Row
                 key={link.href}
                 href={link.href}
                 className="flex items-baseline gap-4 border-b border-line-strong py-3.5 text-[17px]"
@@ -75,7 +89,7 @@ export async function Footer() {
                 <span aria-hidden="true" className="arrow text-sm text-muted">
                   ↗
                 </span>
-              </a>
+              </Row>
             ))}
           </nav>
         </div>

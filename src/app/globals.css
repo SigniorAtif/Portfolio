@@ -773,6 +773,9 @@ body {
 }
 .site-mark-links > div {
   display: flex;
+  /* Without this the empty first item sets the row's baseline at its bottom
+     edge and the links ride above the name's. */
+  align-items: baseline;
   gap: 20px;
   /* The gap from the name is the invisible first item, so the folded column
      reaches zero width (padding or a margin here would hold it open). */
@@ -786,7 +789,7 @@ body {
 .site-mark-links a {
   transition: color var(--dur-hover) var(--ease-hover);
 }
-.site-mark-links a:is(:hover, :focus-visible) {
+.site-mark-links a:is(:hover, :focus-visible, [aria-current="page"]) {
   color: var(--ink);
 }
 /* Unfolded past the hero: the whole page behind the bar blurs and sinks
@@ -852,6 +855,576 @@ body {
   display: block;
 }
 
+/* ---------- about ---------- */
+/* A four-point star that winks in place. */
+.twinkle {
+  position: absolute;
+  width: var(--s, 14px);
+  aspect-ratio: 1;
+  background: var(--dot);
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  opacity: 0;
+  pointer-events: none;
+  animation: twinkle 3.2s var(--d, 0s) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+/* The portrait card that leans towards the mouse. */
+.about-tilt {
+  perspective: 1100px;
+}
+.about-tilt-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  will-change: transform;
+}
+/* The light that follows the pointer across it. */
+.about-tilt-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(440px circle at var(--gx, 50%) var(--gy, 50%), rgb(255 255 255 / 0.16), transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-ui) var(--ease-out);
+}
+.about-tilt-card[data-lit]::after {
+  opacity: 1;
+}
+
+/* The years. Plain list by default; AboutYears sets [data-held] to hold the screen. */
+.about-years-stick {
+  display: grid;
+  gap: 40px;
+  padding-block: clamp(72px, 12vh, 128px);
+}
+.about-year,
+.about-rail {
+  display: none;
+}
+.about-chapters {
+  display: grid;
+  gap: 40px;
+}
+.about-years[data-held] {
+  height: calc(100svh + var(--chapters) * 75svh);
+}
+.about-years[data-held] .about-years-stick {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: clip;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  padding-block: clamp(84px, 13svh, 120px) clamp(28px, 5svh, 56px);
+}
+.about-years[data-held] .about-year {
+  display: block;
+  justify-self: center;
+  font-size: min(31vw, 52svh);
+  font-weight: 800;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  background-size: 5px 5px;
+  background-image: radial-gradient(circle, var(--dot) 1.3px, transparent 1.8px);
+  will-change: transform;
+}
+.about-years[data-held] .about-chapters {
+  gap: 0;
+}
+.about-years[data-held] .about-chapter {
+  grid-area: 1 / 1;
+  align-self: end;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(28px);
+  transition:
+    opacity 0.45s var(--ease-out),
+    transform 0.7s var(--ease-out),
+    visibility 0s 0.45s;
+}
+.about-years[data-held] .about-chapter[data-state="past"] {
+  transform: translateY(-28px);
+}
+.about-years[data-held] .about-chapter[data-state="on"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 0.45s var(--ease-out) 0.1s,
+    transform 0.7s var(--ease-out) 0.1s,
+    visibility 0s;
+}
+/* One tick per year. Lime for the years done, blue for the one the counter is on. */
+.about-years[data-held] .about-rail {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 56px;
+  padding-bottom: 20px;
+}
+.about-tick {
+  position: relative;
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--line-strong);
+  transition:
+    height 0.5s var(--ease-out),
+    background-color 0.3s linear;
+}
+.about-tick[data-state="past"] {
+  background: var(--done);
+}
+.about-tick[data-state="on"] {
+  height: 34px;
+  background: var(--progress);
+}
+.about-tick[data-mark]::after {
+  content: "'" attr(data-mark);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  font-family: var(--font-code), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* What I do. Stacked panels by default; AboutStrands sets [data-track] to run them sideways. */
+.about-strands-stick {
+  position: relative;
+  padding: clamp(72px, 12vh, 128px) var(--gutter);
+}
+.about-strands-track {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+.about-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.about-panel-lead {
+  padding-top: 0;
+  border-top: 0;
+}
+.about-strands-bar {
+  display: none;
+}
+.about-strands[data-track] .about-strands-stick {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 100svh;
+  padding: 0;
+  overflow: hidden;
+}
+.about-strands[data-track] .about-strands-track {
+  flex-direction: row;
+  gap: 0;
+  width: max-content;
+  padding-left: var(--gutter);
+  will-change: transform;
+}
+.about-strands[data-track] .about-panel {
+  flex: none;
+  justify-content: space-between;
+  width: min(74vw, 1080px);
+  height: min(68svh, 640px);
+  padding: 0 clamp(32px, 5vw, 80px);
+  border-top: 0;
+  border-left: 1px solid var(--line);
+}
+.about-strands[data-track] .about-panel-lead {
+  width: min(52vw, 760px);
+  padding-left: 0;
+  border-left: 0;
+}
+.about-strands[data-track] .about-strands-bar {
+  position: absolute;
+  inset: auto var(--gutter) clamp(28px, 5svh, 56px);
+  display: block;
+  height: 2px;
+  background: var(--done);
+  transform-origin: 0 50%;
+  will-change: transform;
+}
+/* Toolbox: two lines of type running opposite ways. */
+.about-marquee {
+  display: grid;
+  gap: 0.1em;
+  overflow: clip;
+  font-size: clamp(40px, 7.4vw, 112px);
+  font-weight: 600;
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
+.about-marquee-row {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+}
+.about-marquee-row ul,
+.about-marquee-row li {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.about-marquee-row li::after {
+  content: "";
+  width: 0.13em;
+  height: 0.13em;
+  margin-inline: 0.38em;
+  border-radius: 50%;
+  background: var(--muted);
+}
+/* The second line sits back: same type, a step down in ink. */
+.about-marquee-row[data-back] {
+  color: var(--line-strong);
+}
+
+/* The desk. A plain picture by default; AboutDesk sets [data-held] and drives --p. */
+.about-desk {
+  --p: 1;
+  padding-block: clamp(72px, 12vh, 128px);
+}
+.about-desk-stick {
+  display: grid;
+  gap: 28px;
+}
+.about-desk-head {
+  display: grid;
+  gap: 16px;
+}
+.about-desk-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin-inline: var(--gutter);
+  overflow: hidden;
+  border-radius: 20px;
+}
+.about-desk-inner {
+  position: absolute;
+  inset: 0;
+  background: var(--panel);
+}
+/* Flat type on its own layer, so the grow below moves it without repainting it. */
+.about-desk-name {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(96px, 24vw, 420px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: var(--line-strong);
+}
+.about-desk-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px 40px;
+}
+.about-desk[data-held] {
+  --p: 0;
+  height: 240svh;
+  padding-block: 0;
+}
+.about-desk[data-held] .about-desk-stick {
+  position: sticky;
+  top: 0;
+  display: block;
+  height: 100svh;
+  overflow: clip;
+}
+/* The heading stands above the small frame and is gone by the time it has grown over it. */
+.about-desk[data-held] .about-desk-head {
+  position: absolute;
+  inset: clamp(84px, 13svh, 120px) 0 auto;
+  opacity: calc(1 - var(--p) * 4);
+  transform: translateY(calc(var(--p) * -6svh));
+  will-change: opacity, transform;
+}
+.about-desk[data-held] .about-desk-frame {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 0;
+  clip-path: inset(
+    calc((1 - var(--p)) * 34svh) calc((1 - var(--p)) * 22vw) calc((1 - var(--p)) * 12svh) round calc((1 - var(--p)) * 28px)
+  );
+  will-change: clip-path;
+}
+.about-desk[data-held] .about-desk-name {
+  transform: scale(calc(1.3 - var(--p) * 0.3));
+  will-change: transform;
+}
+.about-desk[data-held] .about-desk-caption {
+  position: absolute;
+  inset: auto 0 clamp(28px, 5svh, 56px);
+  opacity: calc((var(--p) - 0.8) * 5);
+  transform: translateY(calc((1 - var(--p)) * 40px));
+  will-change: opacity, transform;
+}
+
+/* Off the clock, as a bento: named areas, so each width can lay the boxes out its own way. */
+.about-bento {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-areas:
+    "busy busy busy busy busy busy"
+    "ufo ufo ufo astro astro astro"
+    "dino dino dino dino dino dino"
+    "lang lang lang lang lang lang";
+}
+@media (min-width: 1024px) {
+  .about-bento {
+    gap: 16px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "busy busy busy busy busy busy busy ufo ufo astro astro astro"
+      "busy busy busy busy busy busy busy dino dino dino dino dino"
+      "lang lang lang lang lang lang lang lang lang lang lang lang";
+  }
+}
+.about-tile {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  transition: border-color var(--dur-ui) var(--ease-out);
+}
+@media (hover: hover) {
+  .about-tile:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* Also busy with: the row under the pointer steps forward, the others step back. */
+.about-busy li {
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    transform 0.6s var(--ease-out);
+}
+@media (hover: hover) {
+  .about-busy:hover li:not(:hover) {
+    opacity: 0.3;
+  }
+  .about-busy li:hover {
+    transform: translateX(clamp(8px, 1.4vw, 24px));
+  }
+}
+
+/* The email, one letter per span so each can move. The padding gives the rise a mask to come through. */
+.about-email {
+  display: flex;
+  max-width: 100%;
+  overflow: clip;
+  overflow-clip-margin: 0.2em;
+  padding-block: 0.08em;
+  font-size: clamp(26px, 7.6vw, 132px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.about-email span {
+  display: block;
+  will-change: transform;
+}
+
+/* ---------- contact: the note with blanks ---------- */
+.note {
+  /* Sized by the screen's height as well as its width, so the whole note and the lines under it fit one screen. */
+  font-size: clamp(28px, min(4vw, 6.2vh), 68px);
+  font-weight: 500;
+  line-height: 1.24;
+  letter-spacing: -0.035em;
+  text-wrap: pretty;
+}
+/* A blank: dashed blue while it waits, solid lime once it holds something. */
+.note-blank,
+.note-choice {
+  text-decoration: underline dashed max(2px, 0.045em) var(--progress);
+  text-underline-offset: 0.2em;
+  transition:
+    text-decoration-color var(--dur-ui) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-hover);
+}
+.note-blank {
+  border-radius: 0.12em;
+  outline: none;
+  caret-color: var(--done);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.note-blank:empty::before {
+  content: attr(data-hint);
+  color: var(--muted);
+  opacity: 0.6;
+}
+.note-blank[data-filled="true"],
+.note-choice {
+  text-decoration-style: solid;
+  text-decoration-color: var(--done);
+}
+.note-blank:hover {
+  background: color-mix(in srgb, var(--progress) 8%, transparent);
+}
+.note-blank:focus {
+  background: color-mix(in srgb, var(--progress) 16%, transparent);
+}
+/* A choice is always answered, so always lime. The small arrow says it turns. */
+.note-choice {
+  display: inline;
+  cursor: pointer;
+  text-align: left;
+  letter-spacing: inherit;
+  text-decoration: none;
+}
+/* The underline rides on the word itself, inside the mask, so it rolls with it. */
+.note-choice .swap-word {
+  white-space: nowrap;
+}
+.note-pick {
+  text-decoration: underline solid max(2px, 0.045em) var(--done);
+  text-underline-offset: 0.2em;
+}
+.note-roll {
+  display: inline-block;
+  margin-left: 0.4em;
+  font-family: var(--font-code), monospace;
+  font-size: max(12px, 0.42em);
+  letter-spacing: 0;
+  vertical-align: 0.7em;
+  color: var(--muted);
+  transition:
+    transform 0.6s var(--ease-out),
+    color var(--dur-hover) var(--ease-hover);
+}
+.note-choice:is(:hover, :focus-visible) .note-roll {
+  transform: rotate(180deg);
+  color: var(--done);
+}
+.note-choice:active .note-roll {
+  transform: rotate(360deg);
+}
+.note-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--progress);
+  transition:
+    background-color var(--dur-ui) var(--ease-out),
+    border-color var(--dur-ui) var(--ease-out);
+}
+.note-dot[data-filled="true"] {
+  border-color: var(--done);
+  background: var(--done);
+}
+.note-send,
+.note-copy {
+  display: inline-flex;
+  height: 52px;
+  align-items: center;
+  gap: 0.35em;
+  border-radius: 999px;
+  padding-inline: 24px;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-hover),
+    border-color var(--dur-hover) var(--ease-hover),
+    transform var(--dur-press) linear;
+}
+.note-send {
+  background: var(--ink);
+  color: var(--ground);
+}
+.note-copy {
+  border: 1px solid var(--line-strong);
+  color: var(--body);
+}
+.note-copy:hover {
+  border-color: var(--muted);
+}
+:is(.note-send, .note-copy):active {
+  transform: scale(0.97);
+}
+/* Not whole yet: still pressable (it jumps to the first empty blank), but it reads as waiting. */
+:is(.note-send, .note-copy)[aria-disabled="true"] {
+  opacity: 0.45;
+}
+/* The thank-you, after BluePeak's last words: one big line alone at the centre of the screen, a small one under it between two hairlines. */
+.thanks-line {
+  font-size: clamp(1.75rem, 0.55rem + 3.35vw, 4.5rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+@media (min-width: 900px) {
+  .thanks-line {
+    white-space: nowrap;
+  }
+}
+.thanks-sign {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  font-size: clamp(0.9375rem, 0.85rem + 0.3vw, 1.125rem);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.thanks-sign i {
+  flex: none;
+  width: 2rem;
+  height: 1px;
+  background: var(--done);
+}
+.thanks-sign b {
+  font-weight: inherit;
+  color: var(--ink);
+}
+/* On its way: it looks the same and ignores presses, and the pointer says it is working. */
+.note-send[aria-busy="true"] {
+  cursor: progress;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-roll,
+  .note-send,
+  .note-copy {
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after {
     animation: none;
@@ -871,6 +1444,26 @@ body {
   }
   .deck-media {
     transform: none;
+  }
+  .twinkle {
+    animation: none;
+    opacity: 0.6;
+  }
+  /* The toolbox is a paragraph of names, not a moving line. */
+  .about-marquee {
+    padding-inline: var(--gutter);
+    font-size: clamp(24px, 3vw, 40px);
+  }
+  .about-marquee-row {
+    flex-wrap: wrap;
+    width: auto;
+    white-space: normal;
+  }
+  .about-marquee-row ul {
+    flex-wrap: wrap;
+  }
+  .about-marquee-row ul + ul {
+    display: none;
   }
   .deck-frame,
   .deck-label,

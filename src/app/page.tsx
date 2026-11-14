@@ -1,3 +1,4 @@
+import { Sparks } from "@/components/about/Sparks";
 import { Footer } from "@/components/footer/Footer";
 import { FooterCurtain } from "@/components/footer/FooterCurtain";
 import { Hero } from "@/components/hero/Hero";
@@ -12,6 +13,7 @@ import { reel } from "@/content/reel";
 export default function Home() {
   return (
     <SmoothScroll>
+      <Sparks />
       <SiteMark />
       <main>
         <Hero />

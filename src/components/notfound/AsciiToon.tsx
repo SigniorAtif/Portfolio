@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type JSX } from "react";
+import { useCallback, useEffect, useRef, type JSX } from "react";
 import { gsap } from "@/lib/gsap";
 import { toons, type ToonId } from "./toons";
 import { CoffeeMugSvg } from "./toons/CoffeeMug";
@@ -35,11 +35,8 @@ export function AsciiMug({ className }: { className?: string }) {
   );
 }
 
-type DrawingProps = {
-  Svg: (props: ToonSvgProps) => JSX.Element;
-  /** Fills a paused timeline with the drawing's loop. Must keep the same identity between renders. */
-  animate?: (svg: SVGSVGElement, tl: gsap.core.Timeline) => void;
-  /** Glyph grid. Its shape should match the drawing's viewBox. */
+type GridProps = {
+  /** Glyph grid. Its shape should match the drawing's frame. */
   cols?: number;
   rows?: number;
   /** Backing-store multiplier, for a drawing that will be scaled up on screen. */
@@ -50,42 +47,80 @@ type DrawingProps = {
    * stepping down in clean bands. Solid parts of a drawing are left alone.
    */
   grain?: number;
+  /**
+   * For painted art, which sits in the mid tones and would come out as one grey mass:
+   * the brightness that counts as black and the one that counts as white. What lies
+   * between is stretched to the full range of glyphs.
+   */
+  levels?: [black: number, white: number];
+};
+
+/** A moving picture the dots are read from. */
+export type DotSource = {
+  /** Resolves once there is something to draw. Leave out when that is at once. */
+  ready?: Promise<unknown>;
+  /** Puts the current frame on the small canvas, one pixel per glyph. */
+  draw: (reader: CanvasRenderingContext2D, cols: number, rows: number) => Promise<void> | void;
+  /**
+   * For a picture that can come out of its dots. `whole` says whether a cell shows the
+   * picture itself: it is asked for every cell on every frame, with the cell's place in the
+   * frame (0 to 1 each way) and a number from 0 to 1 that is fixed for that cell, for
+   * scattering. `full` paints the picture at the size given, to fill those cells.
+   */
+  whole?: (x: number, y: number, rank: number) => boolean;
+  full?: (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
+  stop: () => void;
+};
+
+type DotCanvasProps = GridProps & {
+  /**
+   * Starts the picture, standing still when `reduced`. Null when it cannot start.
+   * Must keep the same identity between renders: a new one restarts the picture.
+   */
+  open: (reduced: boolean) => DotSource | null;
 };
 
 /**
- * An SVG drawing as dot-ASCII. The original SVG stays mounted off screen
- * with its animation loop running. A dozen times a second it is serialised,
- * drawn small, and every cell's brightness is turned into one of a few dot
- * glyphs set in the mono font. One renderer serves every drawing.
- *
- * Only what is in the SVG's own attributes and inline styles reaches the
- * glyphs: stylesheet rules do not survive serialising. Nothing is captured
- * while the canvas is hidden.
+ * A picture as dot-ASCII. A dozen times a second the source draws itself
+ * small, and every cell's brightness is turned into one of a few dot glyphs
+ * set in the mono font. Nothing is captured while the canvas is hidden.
  */
-export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness = 1, grain = 0 }: DrawingProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+export function DotCanvas({ open, cols = 72, rows = 54, sharpness = 1, grain = 0, levels }: DotCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [black, white] = levels ?? [undefined, 1];
 
   useEffect(() => {
-    const svg = svgRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!svg || !canvas || !ctx) return;
+    if (!canvas || !ctx) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const style = getComputedStyle(canvas);
     const colour = style.getPropertyValue("--dot").trim() || "#ffffff";
     const family = style.getPropertyValue("--font-code").trim() || "monospace";
 
-    const timeline = gsap.timeline({ paused: reduced });
-    animate?.(svg, timeline);
+    const source = open(reduced);
+    if (!source) return;
 
     const small = document.createElement("canvas");
     small.width = cols;
     small.height = rows;
     const reader = small.getContext("2d", { willReadFrequently: true });
-    const serializer = new XMLSerializer();
     const pointer = { col: -999, row: -999 };
+
+    // The picture itself, for the cells that have stopped being dots, and the mask that cuts it to them.
+    const { full, whole } = source;
+    const layer = full ? document.createElement("canvas") : null;
+    const layerCtx = layer?.getContext("2d");
+    const mask = document.createElement("canvas");
+    mask.width = cols;
+    mask.height = rows;
+    const maskCtx = mask.getContext("2d");
+    const ranks = Float32Array.from({ length: cols * rows }, (_, i) => {
+      const noise = Math.sin((i % cols) * 39.3468 + Math.floor(i / cols) * 11.135) * 43758.5453;
+      return noise - Math.floor(noise);
+    });
+    const cut = maskCtx?.createImageData(cols, rows);
     let cells: Uint8ClampedArray | null = null;
     let busy = false;
     let live = true;
@@ -97,11 +132,18 @@ export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness = 1
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(((width * rows) / cols) * dpr);
       cell = canvas.width / cols;
+      if (layer) {
+        layer.width = canvas.width;
+        layer.height = canvas.height;
+      }
       paint();
     };
 
     const paint = () => {
-      if (!cells) return;
+      // Squeezed to nothing as its page leaves: there is no canvas to draw on.
+      if (!cells || !canvas.width || !canvas.height) return;
+      let any = false;
+      let all = true;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = colour;
       ctx.font = `${(cell * 1.25).toFixed(2)}px ${family}`;
@@ -110,9 +152,19 @@ export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness = 1
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const i = (row * cols + col) * 4;
+          if (whole && cut) {
+            const out = whole((col + 0.5) / cols, (row + 0.5) / rows, ranks[row * cols + col]);
+            cut.data[i + 3] = out ? 255 : 0;
+            if (out) any = true;
+            else all = false;
+            if (out) continue;
+          }
           // The drawings are saturated colours, so take the strongest channel
           // rather than true luminance or the purples would vanish.
-          let value = (Math.max(cells[i], cells[i + 1], cells[i + 2]) / 255) * (cells[i + 3] / 255);
+          let tone = Math.max(cells[i], cells[i + 1], cells[i + 2]) / 255;
+          // The darkest paint still gets a small dot, so the outline stays whole.
+          if (black !== undefined) tone = Math.max(0.3, Math.min(1, (tone - black) / (white - black)));
+          let value = tone * (cells[i + 3] / 255);
           // Only where the drawing is see-through (a beam of light, say), in full once it is a quarter clear.
           const clear = Math.min(1, (1 - cells[i + 3] / 255) * 4);
           if (grain && value > 0 && clear > 0) {
@@ -129,27 +181,33 @@ export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness = 1
         }
       }
       ctx.globalAlpha = 1;
+
+      if (!full || !layer || !layerCtx || !maskCtx || !cut || !any) return;
+      full(layerCtx, layer.width, layer.height);
+      if (!all) {
+        maskCtx.putImageData(cut, 0, 0);
+        layerCtx.save();
+        layerCtx.globalCompositeOperation = "destination-in";
+        layerCtx.imageSmoothingEnabled = false;
+        layerCtx.drawImage(mask, 0, 0, layer.width, layer.height);
+        layerCtx.restore();
+      }
+      ctx.drawImage(layer, 0, 0);
     };
 
-    /** Snapshot the live SVG into the small canvas and repaint the glyphs. */
+    /** Have the source draw its current frame small, and repaint the glyphs from it. */
     const capture = async () => {
       if (busy || !reader || document.hidden) return;
       if (cells && canvas.checkVisibility && !canvas.checkVisibility({ visibilityProperty: true })) return;
       busy = true;
-      const url = URL.createObjectURL(new Blob([serializer.serializeToString(svg)], { type: "image/svg+xml" }));
       try {
-        const image = new Image();
-        image.src = url;
-        await image.decode();
+        await source.draw(reader, cols, rows);
         if (!live) return;
-        reader.clearRect(0, 0, cols, rows);
-        reader.drawImage(image, 0, 0, cols, rows);
         cells = reader.getImageData(0, 0, cols, rows).data;
         paint();
       } catch {
-        // A frame that fails to decode is skipped; the next one replaces it.
+        // A frame that fails to draw is skipped; the next one replaces it.
       } finally {
-        URL.revokeObjectURL(url);
         busy = false;
       }
     };
@@ -164,21 +222,70 @@ export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness = 1
     const sizes = new ResizeObserver(resize);
     sizes.observe(canvas);
     window.addEventListener("pointermove", onMove);
-    void capture();
-    const timer = reduced ? 0 : window.setInterval(capture, 1000 / FPS);
+    void (source.ready ?? Promise.resolve()).then(capture, () => {});
+    // A picture that can come out of its dots keeps repainting even when it stands still.
+    const timer = reduced && !whole ? 0 : window.setInterval(capture, 1000 / FPS);
 
     return () => {
       live = false;
       window.clearInterval(timer);
       sizes.disconnect();
       window.removeEventListener("pointermove", onMove);
-      timeline.kill();
+      source.stop();
     };
-  }, [Svg, animate, cols, rows, sharpness, grain]);
+  }, [open, cols, rows, sharpness, grain, black, white]);
+
+  return <canvas ref={canvasRef} aria-hidden="true" className="block w-full" style={{ aspectRatio: `${cols} / ${rows}` }} />;
+}
+
+type DrawingProps = GridProps & {
+  Svg: (props: ToonSvgProps) => JSX.Element;
+  /** Fills a paused timeline with the drawing's loop. Must keep the same identity between renders. */
+  animate?: (svg: SVGSVGElement, tl: gsap.core.Timeline) => void;
+};
+
+/**
+ * An SVG drawing as dot-ASCII. The original SVG stays mounted off screen
+ * with its animation loop running, and is serialised for every frame. One
+ * renderer serves every drawing.
+ *
+ * Only what is in the SVG's own attributes and inline styles reaches the
+ * glyphs: stylesheet rules do not survive serialising.
+ */
+export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness, grain }: DrawingProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  const open = useCallback(
+    (reduced: boolean): DotSource | null => {
+      const svg = svgRef.current;
+      if (!svg) return null;
+      const timeline = gsap.timeline({ paused: reduced });
+      animate?.(svg, timeline);
+      const serializer = new XMLSerializer();
+      return {
+        async draw(reader, width, height) {
+          const url = URL.createObjectURL(new Blob([serializer.serializeToString(svg)], { type: "image/svg+xml" }));
+          try {
+            const image = new Image();
+            image.src = url;
+            await image.decode();
+            reader.clearRect(0, 0, width, height);
+            reader.drawImage(image, 0, 0, width, height);
+          } finally {
+            URL.revokeObjectURL(url);
+          }
+        },
+        stop: () => timeline.kill(),
+      };
+    },
+    // A new drawing is a new SVG element behind the same ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [Svg, animate],
+  );
 
   return (
     <>
-      <canvas ref={canvasRef} aria-hidden="true" className="block w-full" style={{ aspectRatio: `${cols} / ${rows}` }} />
+      <DotCanvas open={open} cols={cols} rows={rows} sharpness={sharpness} grain={grain} />
       {/* The source drawing: animated, never seen. Kept in the page so its loop runs. */}
       <div
         aria-hidden="true"

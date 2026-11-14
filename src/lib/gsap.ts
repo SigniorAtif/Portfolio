@@ -31,7 +31,9 @@ export function inView(trigger: Element, at: number = IN_VIEW): ScrollTrigger.Va
     once: true,
     start: () => {
       const top = trigger.getBoundingClientRect().top + window.scrollY;
-      return Math.max(0, Math.min(top - window.innerHeight * at, ScrollTrigger.maxScroll(window) - 2));
+      // Never 0 or more for a block already past `at` on load: a trigger whose start
+      // equals the scroll position has not been entered yet, and would wait for a scroll.
+      return Math.max(-1, Math.min(top - window.innerHeight * at, ScrollTrigger.maxScroll(window) - 2));
     },
   };
 }
