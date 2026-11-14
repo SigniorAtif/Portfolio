@@ -14,10 +14,12 @@ type Props = {
    * "chips" also starts each child slightly small.
    */
   each?: "chips" | "cards";
+  /** Share of the viewport height the block's top must cross (0 = top). Defaults to the house value. */
+  at?: number;
 };
 
 /** The quiet default for anything that is not text: 24px up and a fade, once. */
-export function FadeUp({ as: Tag = "div", className, children, delay = 0, each }: Props) {
+export function FadeUp({ as: Tag = "div", className, children, delay = 0, each, at }: Props) {
   const ref = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -34,7 +36,7 @@ export function FadeUp({ as: Tag = "div", className, children, delay = 0, each }
         stagger: each ? staggerFor(targets.length, each === "chips" ? STAGGER.chip : STAGGER.card) : 0,
         delay,
         clearProps: "transform,opacity",
-        scrollTrigger: inView(el),
+        scrollTrigger: inView(el, at),
       });
     },
     { scope: ref },
