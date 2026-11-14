@@ -42,3 +42,6 @@ next-env.d.ts
 
 # python
 __pycache__/
+
+# source art and references; the exported copies live in public/
+/assets-src/
