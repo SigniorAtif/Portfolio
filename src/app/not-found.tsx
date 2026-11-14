@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { AsciiMug, AsciiToon } from "@/components/notfound/AsciiToon";
 import { DotText } from "@/components/notfound/DotText";
 import { SwapLabel } from "@/components/ui/SwapLabel";
@@ -41,9 +41,9 @@ export default function NotFound() {
         className="pointer-events-none absolute bottom-[5svh] left-[1%] w-[clamp(170px,25vw,400px)]"
       />
       <header className="py-6">
-        <Link href="/" className="text-[26px] font-semibold tracking-tight">
+        <PageLink href="/" className="text-[26px] font-semibold tracking-tight">
           {site.name}.
-        </Link>
+        </PageLink>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-[clamp(28px,5vh,56px)] pb-[8svh]">
@@ -58,7 +58,7 @@ export default function NotFound() {
           </p>
           <nav aria-label="Ways out" className="flex flex-wrap justify-center gap-3 pt-2">
             {links.map((link, i) => (
-              <Link
+              <PageLink
                 key={link.href}
                 href={link.href}
                 className={`${button} ${
@@ -66,7 +66,7 @@ export default function NotFound() {
                 }`}
               >
                 <SwapLabel>{link.label}</SwapLabel>
-              </Link>
+              </PageLink>
             ))}
           </nav>
         </div>

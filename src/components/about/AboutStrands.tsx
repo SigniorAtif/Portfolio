@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { Decode } from "@/components/motion/Text";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
@@ -70,12 +70,12 @@ export function AboutStrands({ strands }: { strands: Strand[] }) {
                 <ul className="flex flex-wrap gap-x-7 gap-y-2 pt-2 text-[18px]">
                   {strand.projects.map((project) => (
                     <li key={project.slug}>
-                      <Link href={`/work#${project.slug}`} className="link-line inline-flex items-baseline text-body hover:text-ink">
+                      <PageLink href={`/work#${project.slug}`} className="link-line inline-flex items-baseline text-body hover:text-ink">
                         <SwapLabel>{project.name}</SwapLabel>
                         <span aria-hidden="true" className="arrow text-sm text-muted">
                           ↗
                         </span>
-                      </Link>
+                      </PageLink>
                     </li>
                   ))}
                 </ul>

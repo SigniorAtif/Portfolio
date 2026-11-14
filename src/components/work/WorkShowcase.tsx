@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import type { Project } from "@/content/projects";
 import { WorkDetails } from "./WorkDetails";
 import { WorkIntro, type Backdrop } from "./WorkIntro";
@@ -16,12 +16,12 @@ export function WorkShowcase({ projects, backdrop }: { projects: Project[]; back
       <div className="relative z-10 bg-ground px-[var(--gutter)] pb-[clamp(72px,11vh,140px)] pt-[clamp(40px,6vh,72px)]">
         <WorkDetails projects={projects} focused={focused} />
         <p className="flex justify-end pt-8">
-          <Link href="/work" className="link-line kicker !text-ink">
+          <PageLink href="/work" className="link-line kicker !text-ink">
             Every project, in full
             <span aria-hidden="true" className="arrow">
               ↗
             </span>
-          </Link>
+          </PageLink>
         </p>
       </div>
     </>
