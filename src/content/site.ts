@@ -9,7 +9,7 @@ export const site = {
   first: "ATIF",
   last: "AHMED",
   url: "https://www.ahmedatif.in",
-  email: "mr.dimlit@gmail.com",
+  email: "note@ahmedatif.in",
   location: "Bhubaneswar, IN",
   signOff: "Written at 3am from inside rury",
   description: "Atif Ahmed builds products, tools for agents and the Linux desktop he writes them on.",
