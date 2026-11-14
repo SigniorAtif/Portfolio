@@ -102,6 +102,7 @@ export function Hero() {
         style={{ "--p": 0, "--s": 1, "--below-px": 260 } as React.CSSProperties}
       >
         <div
+          data-no-sparks
           className="absolute overflow-hidden border border-solid"
           style={{
             top: `calc(var(--p) * ${TOP_PX}px)`,

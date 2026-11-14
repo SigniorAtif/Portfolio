@@ -48,6 +48,10 @@ export function SpaceField({ fill = false, density = 1, dotScale = 1 }: Props) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !footer || !ctx) return;
 
+    // The box this field fills (or, behind the footer, is clipped to) is a
+    // quiet zone for the pointer's sparks: see about/Sparks.tsx.
+    footer.setAttribute("data-no-sparks", "");
+
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const colour = getComputedStyle(canvas).getPropertyValue("--dot").trim() || "#ffffff";
     let width = 0;
@@ -112,6 +116,7 @@ export function SpaceField({ fill = false, density = 1, dotScale = 1 }: Props) {
     sizes?.observe(footer);
     return () => {
       cancelAnimationFrame(frame);
+      footer.removeAttribute("data-no-sparks");
       sizes?.disconnect();
       observer.disconnect();
       window.removeEventListener("resize", resize);

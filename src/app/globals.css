@@ -852,6 +852,30 @@ body {
   display: block;
 }
 
+/* ---------- about ---------- */
+/* A four-point star that winks in place. */
+.twinkle {
+  position: absolute;
+  width: var(--s, 14px);
+  aspect-ratio: 1;
+  background: var(--dot);
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  opacity: 0;
+  pointer-events: none;
+  animation: twinkle 3.2s var(--d, 0s) ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after {
     animation: none;
@@ -871,6 +895,10 @@ body {
   }
   .deck-media {
     transform: none;
+  }
+  .twinkle {
+    animation: none;
+    opacity: 0.6;
   }
   .deck-frame,
   .deck-label,
