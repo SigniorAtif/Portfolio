@@ -8,6 +8,7 @@ import { DotCanvas, type DotSource } from "@/components/notfound/AsciiToon";
 import { LOOP, LOOP_EASE_IN_OUT } from "@/components/notfound/toons/types";
 import { gsap } from "@/lib/gsap";
 import { EASE } from "@/lib/motion";
+import { whenStageOpen } from "@/lib/stage";
 
 gsap.registerPlugin(RoughEase);
 
@@ -263,7 +264,10 @@ export function CastleDots({ spirits, away = false }: { spirits: number; away?: 
     const ids = Object.keys(SHEETS) as SheetId[];
     const ready = Promise.all(ids.map((id) => load(SHEETS[id].file))).then((images) => {
       sheets = Object.fromEntries(ids.map((id, i) => [id, images[i]])) as Record<SheetId, HTMLImageElement>;
-      if (running.current === now) arrival.play();
+      // The glide in waits for the veil to leave.
+      void whenStageOpen().then(() => {
+        if (running.current === now) arrival.play();
+      });
     });
 
     return {

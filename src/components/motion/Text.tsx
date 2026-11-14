@@ -3,6 +3,7 @@
 import { useRef, type ElementType, type ReactNode } from "react";
 import { gsap, inView, SplitText, useGSAP } from "@/lib/gsap";
 import { DUR, EASE, STAGGER, reducedMotion, staggerFor } from "@/lib/motion";
+import { useStageOpen } from "@/lib/stage";
 
 // Text arrives by role. Three reveals, all saying "this assembles":
 // Decode for mono kickers and labels, Rise for headings, Lines for body copy.
@@ -30,11 +31,17 @@ type RiseProps = TextProps & {
 /** Headings: words rise through line masks with a slight rotation. No opacity. */
 export function Rise({ as: Tag = "div", className, children, delay = 0, at, aria = "auto" }: RiseProps) {
   const ref = useRef<HTMLElement>(null);
+  const open = useStageOpen();
 
   useGSAP(
     () => {
       const el = ref.current;
       if (!el || reducedMotion()) return;
+      if (!open) {
+        // Held back until the veil is leaving.
+        gsap.set(el, { autoAlpha: 0 });
+        return;
+      }
       SplitText.create(el, {
         type: "lines,words",
         mask: "lines",
@@ -53,7 +60,7 @@ export function Rise({ as: Tag = "div", className, children, delay = 0, at, aria
           }),
       });
     },
-    { scope: ref },
+    { scope: ref, dependencies: [open], revertOnUpdate: true },
   );
 
   return (
@@ -66,11 +73,17 @@ export function Rise({ as: Tag = "div", className, children, delay = 0, at, aria
 /** Body copy: each line slides up out of its own mask. */
 export function Lines({ as: Tag = "div", className, children, delay = 0, at }: TextProps) {
   const ref = useRef<HTMLElement>(null);
+  const open = useStageOpen();
 
   useGSAP(
     () => {
       const el = ref.current;
       if (!el || reducedMotion()) return;
+      if (!open) {
+        // Held back until the veil is leaving.
+        gsap.set(el, { autoAlpha: 0 });
+        return;
+      }
       SplitText.create(el, {
         type: "lines",
         mask: "lines",
@@ -89,7 +102,7 @@ export function Lines({ as: Tag = "div", className, children, delay = 0, at }: T
           }),
       });
     },
-    { scope: ref },
+    { scope: ref, dependencies: [open], revertOnUpdate: true },
   );
 
   return (
@@ -120,6 +133,7 @@ type DecodeProps = {
 export function Decode({ as: Tag = "span", className, children: text, delay = 0 }: DecodeProps) {
   const ref = useRef<HTMLElement>(null);
   const outRef = useRef<HTMLSpanElement>(null);
+  const open = useStageOpen();
 
   useGSAP(
     () => {
@@ -141,6 +155,8 @@ export function Decode({ as: Tag = "span", className, children: text, delay = 0 
       };
 
       gsap.set(outRef.current, { autoAlpha: 0 });
+      // Held back until the veil is leaving.
+      if (!open) return;
       gsap.to(clock, {
         ms: total,
         duration: total / 1000,
@@ -160,7 +176,7 @@ export function Decode({ as: Tag = "span", className, children: text, delay = 0 
         node.nodeValue = text;
       };
     },
-    { scope: ref, dependencies: [text, delay], revertOnUpdate: true },
+    { scope: ref, dependencies: [text, delay, open], revertOnUpdate: true },
   );
 
   return (

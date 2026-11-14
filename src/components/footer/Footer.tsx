@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { footerNav, site, socials } from "@/content/site";
 import { FooterMark } from "./FooterMark";
@@ -25,9 +25,9 @@ async function currentYear() {
 /** A footer row: a route change for a page, a plain anchor for a place on this one. */
 function Row({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
   return href.startsWith("/") ? (
-    <Link href={href} className={className}>
+    <PageLink href={href} className={className}>
       {children}
-    </Link>
+    </PageLink>
   ) : (
     <a href={href} className={className}>
       {children}

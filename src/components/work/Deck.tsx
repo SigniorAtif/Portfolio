@@ -108,7 +108,9 @@ export default function Deck({ projects, onFocus, drive, seat = 0.5, around, tig
     const cursor = cursorRef.current;
     let hovered: Element | null = null; // the card under the mouse
     const drag = { id: -1, startX: 0, lastX: 0, lastAt: 0, speed: 0 };
-    const written = { transforms: new Array<string>(slots).fill(""), shown: new Array<boolean>(slots).fill(false), tip: "" };
+    // Nothing is assumed about what the cards carry already: a page kept alive while another was
+    // open comes back with the last wheel still written on them, so the first frame writes them all.
+    const written = { transforms: new Array<string>(slots).fill(""), shown: new Array<boolean | null>(slots).fill(null), tip: "" };
     const playing = new Array<boolean>(slots).fill(false);
     let frame = 0;
     let last = 0;
@@ -382,6 +384,15 @@ export default function Deck({ projects, onFocus, drive, seat = 0.5, around, tig
 
     return () => {
       stop();
+      // Leave no marks behind for the next run to trip over.
+      hovered?.removeAttribute("data-hover");
+      cursor?.removeAttribute("data-on");
+      delete stage.dataset.dragging;
+      // Asked of the stage: by now the card refs may already be let go.
+      for (const card of stage.querySelectorAll<HTMLElement>(".deck-card")) {
+        delete card.dataset.focused;
+        card.querySelector("video")?.pause();
+      }
       watcher.disconnect();
       sizes.disconnect();
       stage.removeEventListener("pointerdown", onPointerDown);

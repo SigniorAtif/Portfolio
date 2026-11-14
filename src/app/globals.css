@@ -828,6 +828,179 @@ body {
   }
 }
 
+/* ---------- context menu ---------- */
+/* The site's own right-click menu (components/nav/ContextMenu): the site mark's
+   frosted chip, a little denser so it reads over anything. It spreads out from
+   the pointer like the veil. One white dot marks the active row and slides
+   between rows; it turns lime once a copy is done. A ring marks this page. */
+.cmenu {
+  --dot-x: 19px;
+  position: fixed;
+  left: var(--left, 0px);
+  top: var(--top, 0px);
+  z-index: 90; /* over everything but the veil (100) */
+  min-width: 236px;
+  max-width: 300px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ground) 80%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.6);
+  outline: none;
+  user-select: none;
+  /* backwards: the clip only exists while it plays, so it never cuts the shadow. */
+  animation: cmenu-open 0.42s var(--ease-out) backwards;
+}
+.cmenu:focus-visible {
+  outline: none;
+}
+@keyframes cmenu-open {
+  from {
+    clip-path: circle(0px at var(--ox) var(--oy));
+  }
+  to {
+    clip-path: circle(var(--reach) at var(--ox) var(--oy));
+  }
+}
+.cmenu[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s var(--ease-out);
+}
+/* Hold still while "Copied" shows, so the dot stays on the row that did it. */
+.cmenu[data-done] {
+  pointer-events: none;
+}
+.cmenu-item {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 10px 6px 28px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-align: left;
+  color: var(--muted);
+  cursor: pointer;
+  /* Transparent until forced colours make it the focus ring. */
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition:
+    color var(--dur-hover) var(--ease-hover),
+    background-color var(--dur-hover) var(--ease-hover);
+}
+.cmenu-item:focus,
+.cmenu-item[aria-current="page"] {
+  color: var(--ink);
+}
+.cmenu-item:focus {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.cmenu-item:focus-visible {
+  outline-color: transparent;
+}
+.cmenu-item[aria-disabled="true"] {
+  cursor: default;
+}
+.cmenu-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--dot-x) - 6px - 3.5px);
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+}
+.cmenu-hint {
+  margin-left: auto;
+  font-family: var(--font-code), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.cmenu-item:focus .cmenu-hint {
+  color: var(--muted);
+}
+.cmenu-dot {
+  position: absolute;
+  left: var(--dot-x);
+  top: 0;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--dot);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(var(--dot-y));
+  transition:
+    transform 0.3s var(--ease-out),
+    opacity 0.2s var(--ease-out),
+    background-color 0.2s var(--ease-out);
+}
+.cmenu-dot[data-on] {
+  opacity: 1;
+}
+.cmenu[data-done] .cmenu-dot {
+  background: var(--done);
+}
+.cmenu-kicker {
+  overflow: hidden;
+  padding: 6px 10px 4px 28px;
+  font-family: var(--font-code), monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmenu-rule {
+  height: 1px;
+  margin: 6px 10px 6px 28px;
+  border: 0;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+.cmenu-foot {
+  padding: 10px 10px 6px 28px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  margin-top: 6px;
+  font-family: var(--font-code), monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.cmenu-foot kbd {
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: inherit;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmenu {
+    animation: cmenu-fade 0.12s linear backwards;
+  }
+  .cmenu-dot {
+    transition: opacity 0.2s linear;
+  }
+}
+@keyframes cmenu-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 /* ---------- footer ---------- */
 /* The name, stretched tall from its base. The wrapper's top padding makes room for the stretch. */
 .footmark {
@@ -1492,5 +1665,30 @@ body {
     font-weight: 600;
     line-height: 1.02;
     letter-spacing: -0.035em;
+  }
+}
+
+/* The veil: the loader and the page transition (components/transition/Veil).
+   The server sends it as a flat sheet of the ground colour, so the page never
+   shows before its loader; once the script is running the canvas paints instead. */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--ground);
+}
+
+.veil[data-live] {
+  background: transparent;
+}
+
+/* If the script never starts, the sheet lets go by itself. */
+.veil:not([data-live]) {
+  animation: veil-bail 0s linear 12s forwards;
+}
+
+@keyframes veil-bail {
+  to {
+    visibility: hidden;
   }
 }

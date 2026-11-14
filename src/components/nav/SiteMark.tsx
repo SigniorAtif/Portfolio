@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { FRAMED_AT, heroProgress } from "@/components/hero/progress";
 import { pages, site } from "@/content/site";
 
@@ -71,7 +71,7 @@ export function SiteMark({ page }: { page?: string }) {
 
   const folded = state === "mark" && !open;
   // The name goes home from any other page, and to the top of home itself.
-  const Name = page ? Link : "a";
+  const Name = page ? PageLink : "a";
   const closeOnTap = () => {
     if (touchRef.current) setOpen(false);
   };
@@ -121,9 +121,9 @@ export function SiteMark({ page }: { page?: string }) {
         <nav aria-label="Primary" className="site-mark-fold site-mark-links">
           <div>
             {pages.map((link) => (
-              <Link key={link.href} href={link.href} aria-current={link.href === page ? "page" : undefined} onClick={closeOnTap}>
+              <PageLink key={link.href} href={link.href} aria-current={link.href === page ? "page" : undefined} onClick={closeOnTap}>
                 {link.label}
-              </Link>
+              </PageLink>
             ))}
           </div>
         </nav>

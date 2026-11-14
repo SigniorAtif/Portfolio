@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { SpaceField } from "@/components/footer/SpaceField";
 import { Decode } from "@/components/motion/Text";
 import { featured } from "@/content/projects";
@@ -69,9 +69,9 @@ export function AboutDesk() {
 
         <div className="about-desk-caption px-[var(--gutter)]">
           <p className="max-w-[34rem] text-[18px] leading-[1.45] text-body">{rury?.summary}</p>
-          <Link href="/work#rury" className="kicker whitespace-nowrap !text-ink">
+          <PageLink href="/work#rury" className="kicker whitespace-nowrap !text-ink">
             See rury<span className="arrow">↗</span>
-          </Link>
+          </PageLink>
         </div>
       </div>
     </section>
