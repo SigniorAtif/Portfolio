@@ -282,6 +282,8 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     let assembleStart = 0;
     let last = performance.now();
     let nextGlint = Infinity;
+    // Put the head and the star straight onto their marks on the next drawn frame.
+    let settle = false;
     const born = performance.now();
     const turn = { yaw: 0, pitch: 0, on: 0 };
     const light = { x: -0.45, y: 0.6 }; // stage coordinates, -1..1
@@ -323,11 +325,16 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
         const cy = Math.cos(0.33 * clock);
         [targetX, targetY, yawTo, pitchTo, headRate] = [0.62 * sx, 0.22 + 0.42 * cy, 0.35 * sx, -0.12 * cy, 1.5];
       }
+      const onTo = Math.min(1, 1.6 * uniforms.uAssemble.value);
+      if (settle) {
+        settle = false;
+        [light.x, light.y, turn.yaw, turn.pitch, turn.on] = [targetX, targetY, yawTo, pitchTo, onTo];
+      }
       light.x += (targetX - light.x) * ease(5);
       light.y += (targetY - light.y) * ease(5);
       turn.yaw += (yawTo - turn.yaw) * ease(headRate);
       turn.pitch += (pitchTo - turn.pitch) * ease(headRate);
-      turn.on += (Math.min(1, 1.6 * uniforms.uAssemble.value) - turn.on) * ease(4);
+      turn.on += (onTo - turn.on) * ease(4);
       uniforms.uYaw.value = turn.yaw;
       uniforms.uPitch.value = turn.pitch;
       const halfHeight = camera.position.z * Math.tan((FOV * Math.PI) / 360);
@@ -361,13 +368,24 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
         points.frustumCulled = false;
         scene.add(points);
 
+        // Only a direct home load assembles the portrait from the loader's ring.
+        // Anywhere else it is finished already, so it draws now, behind the veil,
+        // facing the star: the reveal then uncovers it mid-follow instead of
+        // showing a head that looks elsewhere and then turns to find the star.
+        // This also paints over the last frame a kept-alive page left behind.
+        if (reduced || !homeIntro) {
+          if (reduced) uniforms.uAssemble.value = 1;
+          else assembleStart = performance.now() - SETTLED_MS;
+          settle = true;
+          tick(performance.now());
+          report(1);
+          return;
+        }
+
         report(1);
-        // Returning home reveals the finished portrait. Only a direct home
-        // load assembles it from the loader's ring.
         await whenStageOpen();
         if (disposed) return;
-        if (reduced) uniforms.uAssemble.value = 1;
-        else assembleStart = performance.now() - (homeIntro ? 0 : SETTLED_MS);
+        assembleStart = performance.now();
         frame = requestAnimationFrame(tick);
       })
       .catch(() => {
