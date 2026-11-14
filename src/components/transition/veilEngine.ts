@@ -13,18 +13,22 @@ const BAND = 0.4; // width of the ripple's soft edge, as a share of its reach
 const RING_PX = 56; // the ring the portrait's dots leave from (BustStage)
 const RING_S = 1.05;
 const GIVE_UP_MS = 8000;
+const HELLO_FADE_MS = 750; // Hello's soft fade in
 
-// A measured first hello, a quick run of languages, then a breath on Welcome.
-export const GREETINGS = [
-  { text: "Hello", ms: 900 },
-  { text: "Bonjour", ms: 260 },
-  { text: "Hola", ms: 240 },
-  { text: "Ciao", ms: 240 },
-  { text: "Olá", ms: 240 },
-  { text: "Namaste", ms: 260 },
-  { text: "Hallo", ms: 300 },
-  { text: "Welcome", ms: 650 },
-] as const;
+// A soft first hello, then a quick, even run of languages in their own scripts
+// whose last word holds still before it gathers into the portrait.
+// `pause` is blank time at the start of a word's turn, before the word shows.
+type Word = { text: string; ms: number; pause?: number };
+export const GREETINGS: readonly Word[] = [
+  { text: "Hello", ms: 1400, pause: 80 },
+  { text: "Hola", ms: 190 },
+  { text: "مرحبا", ms: 190 },
+  { text: "こんにちは", ms: 190 },
+  { text: "안녕하세요", ms: 190 },
+  { text: "Ciao", ms: 190 },
+  { text: "Olá", ms: 900 }, // the last word: on with the beat, then held
+];
+const CUT_MS = 35; // words in the run swap with a near cut, in and out
 const BOOT_MS = GREETINGS.reduce((total, word) => total + word.ms, 0);
 
 export type Point = { x: number; y: number };
@@ -241,7 +245,7 @@ export function createEngine(
         greetingAge -= GREETINGS[greetingIndex].ms;
         greetingIndex++;
       }
-      // A slow download holds Welcome; it never restarts the greeting cycle.
+      // A slow download holds the last word; it never restarts the greeting cycle.
       const finished = waited >= (plain ? 200 : BOOT_MS * pace);
       if (!asked && finished && (real >= 0.999 || waited >= GIVE_UP_MS)) {
         asked = true;
@@ -359,10 +363,9 @@ export function createEngine(
       // Words take turns on the same baseline. Never crossfade two different
       // words on top of one another: their dots would make an illegible smear.
       const final = greetingIndex === GREETINGS.length - 1;
-      const entrance = greetingIndex === 0
-        ? easeOut((greetingAge - 80) / 650)
-        : easeOut(greetingAge / (final ? 180 : 70));
-      const exit = final ? 1 : ease(clamp((GREETINGS[greetingIndex].ms - greetingAge) / 65));
+      const shown = greetingAge - (GREETINGS[greetingIndex].pause ?? 0);
+      const entrance = greetingIndex === 0 ? ease(clamp(shown / HELLO_FADE_MS)) : easeOut(shown / CUT_MS);
+      const exit = final ? 1 : ease(clamp((GREETINGS[greetingIndex].ms - greetingAge) / CUT_MS));
       drawGreeting(greetingIndex, entrance * exit);
       return;
     }
@@ -471,19 +474,19 @@ export function createEngine(
           live = true;
           break;
         case "ring": {
-          // Welcome's actual dots travel to the ring, preserving the first frame.
+          // The last word's actual dots travel to the ring, preserving the first frame.
           ring = { x: message.x / width, y: message.y / height };
           particles = [];
-          const welcome = greetings[greetings.length - 1];
-          if (welcome) {
-            for (let i = 0; i < welcome.dots.length; i += 3) {
-              const x = welcome.dots[i];
-              const y = welcome.dots[i + 1];
+          const last = greetings[greetings.length - 1];
+          if (last) {
+            for (let i = 0; i < last.dots.length; i += 3) {
+              const x = last.dots[i];
+              const y = last.dots[i + 1];
               particles.push({
                 x, y,
                 angle: Math.atan2((y - ring.y) * height, (x - ring.x) * width),
                 delay: (i * 0.618) % 1,
-                size: welcome.radius * welcome.dots[i + 2],
+                size: last.radius * last.dots[i + 2],
               });
             }
             // Preserve angular order while spreading the wide word evenly

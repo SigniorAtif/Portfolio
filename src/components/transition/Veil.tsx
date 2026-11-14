@@ -10,7 +10,7 @@ import { createEngine, GREETINGS, greetingGridFor, gridFor, type EngineEvent, ty
 
 // One sheet of dots over the whole site, the same material as the portrait.
 //
-// Direct home load: greetings appear in dots; Welcome gathers into the portrait's ring.
+// Direct home load: greetings appear in dots; the last one gathers into the portrait's ring.
 // Other direct loads show the page name and open with the usual entry ripple.
 //
 // Between pages: a ripple of dots spreads from the pressed link until it covers
