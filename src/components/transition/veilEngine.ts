@@ -13,18 +13,31 @@ const BAND = 0.4; // width of the ripple's soft edge, as a share of its reach
 const RING_PX = 56; // the ring the portrait's dots leave from (BustStage)
 const RING_S = 1.05;
 const GIVE_UP_MS = 8000;
+// The frame the greetings light: the dots outside a rounded box around the words.
+const FRAME_X = 0.78; // the box's half-width, as a share of half the viewport
+const FRAME_Y = 0.68;
+const FRAME_BAND = 0.09; // how quickly the frame thins away from the edges
+const FRAME_LIT = 0.24; // share of the frame's dots on by the last word, an equal part per word
+const FRAME_DIM = 0.3; // how bright the last word's part is, against Hello's at full
+const HELLO_FADE_MS = 750; // Hello's soft fade in; the frame's first lights wait for it
+const FRAME_FADE_MS = 450; // and then fade in themselves; later parts switch on at once
 
-// A measured first hello, a quick run of languages, then a breath on Welcome.
-export const GREETINGS = [
-  { text: "Hello", ms: 900 },
-  { text: "Bonjour", ms: 260 },
-  { text: "Hola", ms: 240 },
-  { text: "Ciao", ms: 240 },
-  { text: "Olá", ms: 240 },
-  { text: "Namaste", ms: 260 },
-  { text: "Hallo", ms: 300 },
-  { text: "Welcome", ms: 650 },
-] as const;
+// A soft first hello, then a quick, even run of languages in their own scripts
+// whose last word holds still before everything gathers into the portrait.
+// The frame's first lights fade in once Hello is fully in; each word after it
+// switches on its own, dimmer part the moment it shows. All stay on until the ring.
+// `pause` is blank time at the start of a word's turn, before the word shows.
+type Word = { text: string; ms: number; pause?: number };
+export const GREETINGS: readonly Word[] = [
+  { text: "Hello", ms: 1400, pause: 80 },
+  { text: "Hola", ms: 190 },
+  { text: "مرحبا", ms: 190 },
+  { text: "こんにちは", ms: 190 },
+  { text: "안녕하세요", ms: 190 },
+  { text: "Ciao", ms: 190 },
+  { text: "Olá", ms: 900 }, // the last word: on with the beat, then held
+];
+const CUT_MS = 35; // words in the run swap with a near cut, in and out
 const BOOT_MS = GREETINGS.reduce((total, word) => total + word.ms, 0);
 
 export type Point = { x: number; y: number };
@@ -76,13 +89,18 @@ export type Frames = { request: (callback: (now: number) => void) => number; can
 export type Engine = { handle: (message: HostMessage) => void; stop: () => void };
 
 type Mode = "boot" | "cover" | "wait" | "reveal" | "ring" | "idle";
-type Particle = { x: number; y: number; angle: number; delay: number; size: number };
+type Particle = { x: number; y: number; angle: number; delay: number; size: number; glow: number };
+/** A frame dot, at viewport-relative x and y, on from `at` (greeting time, in ms). */
+type Spark = { x: number; y: number; at: number; size: number; glow: number };
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const easeOut = (t: number) => 1 - (1 - clamp(t)) ** 4;
+
+/** Every how many greeting cells the faint matrix puts a dot: about 12px apart. */
+const strideFor = (grid: Grid) => Math.max(1, Math.ceil(12 / grid.cell));
 
 /** The dot grid for a viewport. Host and engine both use it, so masks line up with the dots. */
 export function gridFor(width: number, height: number): Grid {
@@ -148,6 +166,7 @@ export function createEngine(
   let greetingIndex = 0;
   let greetingAge = 0;
   let asked = false;
+  let sparks: Spark[] = [];
 
   // travel
   let loads = 1;
@@ -156,6 +175,7 @@ export function createEngine(
 
   // ring
   let particles: Particle[] = [];
+  let glows: number[] = []; // the brightness levels among the particles
   let ring: Point = { x: 0, y: 0 };
   let openedAt = 0;
 
@@ -205,6 +225,70 @@ export function createEngine(
     }
   };
 
+  /**
+   * Pick the frame's dots and when each lights. They sit on the faint matrix,
+   * outside a hand-drawn-looking box around the words, and are drawn in a
+   * random order weighted to the corners first, then the edges.
+   */
+  const scatter = () => {
+    sparks = [];
+    const radius = greetings[0]?.radius;
+    if (plain || !radius || !width || !height) return;
+    const g = greetingGrid;
+    const stride = strideFor(g);
+    // The words' footprint stays clear on any screen, whatever the box.
+    let x0 = 0.5, x1 = 0.5, y0 = 0.5, y1 = 0.5;
+    for (const { dots } of greetings) {
+      for (let i = 0; i < dots.length; i += 3) {
+        x0 = Math.min(x0, dots[i]);
+        x1 = Math.max(x1, dots[i]);
+        y0 = Math.min(y0, dots[i + 1]);
+        y1 = Math.max(y1, dots[i + 1]);
+      }
+    }
+    const margin = g.cell * stride * 3;
+    const band = FRAME_BAND * (width + height) / 2;
+    const turn = [Math.random(), Math.random(), Math.random()].map((r) => r * Math.PI * 2);
+    const pool: { x: number; y: number; near: number; key: number }[] = [];
+    for (let row = 0; row < g.rows; row += stride) {
+      for (let col = 0; col < g.cols; col += stride) {
+        const x = g.left + col * g.cell;
+        const y = g.top + row * g.cell;
+        if (x < 0 || x > width || y < 0 || y > height) continue;
+        if (x > x0 * width - margin && x < x1 * width + margin && y > y0 * height - margin && y < y1 * height + margin) continue;
+        const u = (2 * x) / width - 1;
+        const v = (2 * y) / height - 1;
+        const angle = Math.atan2(v, u);
+        const wobble = 1 + 0.08 * (0.5 * Math.sin(2 * angle + turn[0]) + 0.3 * Math.sin(3 * angle + turn[1]) + 0.2 * Math.sin(5 * angle + turn[2]));
+        if ((Math.abs(u) / (FRAME_X * wobble)) ** 4 + (Math.abs(v) / (FRAME_Y * wobble)) ** 4 < 1) continue;
+        // 1 on an edge, 2 in a corner, fading toward the box.
+        const near = Math.exp(-Math.min(x, width - x) / band) + Math.exp(-Math.min(y, height - y) / band);
+        // A weighted shuffle: heavier dots tend to come first.
+        pool.push({ x, y, near, key: Math.random() ** (1 / (near * near)) });
+      }
+    }
+    pool.sort((a, b) => b.key - a.key);
+    // One equal part per word, all on at once as the word appears (Hello's
+    // once its fade is done), each part dimmer than the one before.
+    const share = (pool.length * FRAME_LIT) / GREETINGS.length;
+    let start = 0;
+    GREETINGS.forEach((word, index) => {
+      const at = start + (word.pause ?? 0) + (index === 0 ? HELLO_FADE_MS : 0);
+      const glow = mix(1, FRAME_DIM, index / (GREETINGS.length - 1));
+      for (let i = Math.round(index * share); i < Math.round((index + 1) * share); i++) {
+        const { x, y, near } = pool[i];
+        sparks.push({
+          x: x / width,
+          y: y / height,
+          at,
+          glow,
+          size: Math.max(radius, 2) * mix(0.5, 1, clamp(near)) * mix(0.85, 1, Math.random()),
+        });
+      }
+      start += word.ms;
+    });
+  };
+
   const rest = () => {
     mode = "idle";
     frames.cancel(frame);
@@ -213,6 +297,8 @@ export function createEngine(
     spelled = null;
     label = null;
     particles = [];
+    glows = [];
+    sparks = [];
     emit({ type: "rest" });
   };
 
@@ -241,7 +327,7 @@ export function createEngine(
         greetingAge -= GREETINGS[greetingIndex].ms;
         greetingIndex++;
       }
-      // A slow download holds Welcome; it never restarts the greeting cycle.
+      // A slow download holds the last word; it never restarts the greeting cycle.
       const finished = waited >= (plain ? 200 : BOOT_MS * pace);
       if (!asked && finished && (real >= 0.999 || waited >= GIVE_UP_MS)) {
         asked = true;
@@ -345,7 +431,7 @@ export function createEngine(
         : 1 - ease(clamp((now - since) / (RING_S * 650)));
       ctx.globalAlpha = opacity * 0.12;
       ctx.beginPath();
-      const stride = Math.max(1, Math.ceil(12 / greetingGrid.cell));
+      const stride = strideFor(greetingGrid);
       for (let row = 0; row < greetingGrid.rows; row += stride) {
         for (let col = 0; col < greetingGrid.cols; col += stride) {
           ctx.rect(greetingGrid.left + col * greetingGrid.cell - 0.65, greetingGrid.top + row * greetingGrid.cell - 0.65, 1.3, 1.3);
@@ -356,13 +442,29 @@ export function createEngine(
     }
 
     if (mode === "boot") {
+      // The frame: each word switches on its part, which stays lit. Parts are
+      // stored in order, so each brightness is one run and one fill. Only
+      // Hello's part, the first, fades in.
+      const t = (now - bootStart) / pace;
+      for (let i = 0; i < sparks.length && t >= sparks[i].at; ) {
+        const { glow, at } = sparks[i];
+        ctx.globalAlpha = glow * (i === 0 ? ease(clamp((t - at) / FRAME_FADE_MS)) : 1);
+        ctx.beginPath();
+        for (; i < sparks.length && sparks[i].glow === glow && t >= sparks[i].at; i++) {
+          const { x, y, size } = sparks[i];
+          ctx.moveTo(x * width + size, y * height);
+          ctx.arc(x * width, y * height, size, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
       // Words take turns on the same baseline. Never crossfade two different
       // words on top of one another: their dots would make an illegible smear.
       const final = greetingIndex === GREETINGS.length - 1;
-      const entrance = greetingIndex === 0
-        ? easeOut((greetingAge - 80) / 650)
-        : easeOut(greetingAge / (final ? 180 : 70));
-      const exit = final ? 1 : ease(clamp((GREETINGS[greetingIndex].ms - greetingAge) / 65));
+      const shown = greetingAge - (GREETINGS[greetingIndex].pause ?? 0);
+      const entrance = greetingIndex === 0 ? ease(clamp(shown / HELLO_FADE_MS)) : easeOut(shown / CUT_MS);
+      const exit = final ? 1 : ease(clamp((GREETINGS[greetingIndex].ms - greetingAge) / CUT_MS));
       drawGreeting(greetingIndex, entrance * exit);
       return;
     }
@@ -370,15 +472,20 @@ export function createEngine(
     if (mode === "ring") {
       const q = (now - since) / 1000 / RING_S;
       const fade = opened ? 1 - ease(clamp((now - openedAt) / 450)) : 1;
-      for (const p of particles) {
-        const e = ease(clamp((q - p.delay * 0.16) / 0.84));
-        const arc = Math.sin(e * Math.PI);
-        const x = mix(p.x * width, ring.x * width + Math.cos(p.angle) * RING_PX, e) + Math.sin(p.angle * 2) * arc * 12;
-        const y = mix(p.y * height, ring.y * height + Math.sin(p.angle) * RING_PX, e) + Math.cos(p.angle * 2) * arc * 12;
-        const radius = mix(p.size, 0.9, e);
-        ctx.globalAlpha = fade;
+      // The frame's dots keep their brightness on the way in: one fill per level.
+      for (const glow of glows) {
+        ctx.globalAlpha = fade * glow;
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        for (const p of particles) {
+          if (p.glow !== glow) continue;
+          const e = ease(clamp((q - p.delay * 0.16) / 0.84));
+          const arc = Math.sin(e * Math.PI);
+          const x = mix(p.x * width, ring.x * width + Math.cos(p.angle) * RING_PX, e) + Math.sin(p.angle * 2) * arc * 12;
+          const y = mix(p.y * height, ring.y * height + Math.sin(p.angle) * RING_PX, e) + Math.cos(p.angle * 2) * arc * 12;
+          const radius = mix(p.size, 0.9, e);
+          ctx.moveTo(x + radius, y);
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+        }
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -448,6 +555,7 @@ export function createEngine(
           take(message.glyphs);
           measure(message.size);
           mode = "boot";
+          scatter();
           since = now;
           bootStart = now;
           draw(now, 0);
@@ -457,6 +565,7 @@ export function createEngine(
         case "resize":
           take(message.glyphs);
           measure(message.size);
+          if (mode === "boot") scatter();
           break;
         case "glyphs":
           // The real font has arrived: the text was measured in a fallback until now.
@@ -471,28 +580,28 @@ export function createEngine(
           live = true;
           break;
         case "ring": {
-          // Welcome's actual dots travel to the ring, preserving the first frame.
+          // The last word's actual dots travel to the ring, preserving the first frame.
           ring = { x: message.x / width, y: message.y / height };
           particles = [];
-          const welcome = greetings[greetings.length - 1];
-          if (welcome) {
-            for (let i = 0; i < welcome.dots.length; i += 3) {
-              const x = welcome.dots[i];
-              const y = welcome.dots[i + 1];
-              particles.push({
-                x, y,
-                angle: Math.atan2((y - ring.y) * height, (x - ring.x) * width),
-                delay: (i * 0.618) % 1,
-                size: welcome.radius * welcome.dots[i + 2],
-              });
+          const leave = (x: number, y: number, delay: number, size: number, glow: number) =>
+            particles.push({ x, y, angle: Math.atan2((y - ring.y) * height, (x - ring.x) * width), delay, size, glow });
+          const last = greetings[greetings.length - 1];
+          if (last) {
+            for (let i = 0; i < last.dots.length; i += 3) {
+              leave(last.dots[i], last.dots[i + 1], (i * 0.618) % 1, last.radius * last.dots[i + 2], 1);
             }
-            // Preserve angular order while spreading the wide word evenly
-            // around the circle, avoiding two dense clumps at its sides.
-            particles.sort((a, b) => a.angle - b.angle);
-            particles.forEach((particle, index) => {
-              particle.angle = -Math.PI + (index / particles.length) * Math.PI * 2;
-            });
           }
+          // The frame lets go too: everything on screen gathers into the portrait.
+          const t = (now - bootStart) / pace;
+          for (const spark of sparks) if (spark.at <= t) leave(spark.x, spark.y, Math.random(), spark.size, spark.glow);
+          sparks = [];
+          // Preserve angular order while spreading the wide word evenly
+          // around the circle, avoiding two dense clumps at its sides.
+          particles.sort((a, b) => a.angle - b.angle);
+          particles.forEach((particle, index) => {
+            particle.angle = -Math.PI + (index / particles.length) * Math.PI * 2;
+          });
+          glows = [...new Set(particles.map((particle) => particle.glow))];
           mode = "ring";
           since = now;
           opened = false;

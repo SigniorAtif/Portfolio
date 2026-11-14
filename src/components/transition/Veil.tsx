@@ -10,7 +10,7 @@ import { createEngine, GREETINGS, greetingGridFor, gridFor, type EngineEvent, ty
 
 // One sheet of dots over the whole site, the same material as the portrait.
 //
-// Direct home load: greetings appear in dots; Welcome gathers into the portrait's ring.
+// Direct home load: greetings appear in dots; the last one gathers into the portrait's ring.
 // Other direct loads show the page name and open with the usual entry ripple.
 //
 // Between pages: a ripple of dots spreads from the pressed link until it covers
@@ -52,28 +52,57 @@ function prepare(pen: Pen, grid: Grid, font: string) {
   pen.font = font;
 }
 
+// The display face is Latin only, so other scripts come from the system's own
+// faces for them, a weight lighter so the strokes stay apart in dots.
+const SCRIPTS = [
+  {
+    letters: /[\u3040-\u30ff\u3400-\u9fff]/, // Japanese
+    faces: '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic", YuGothic, Meiryo, sans-serif',
+  },
+  {
+    letters: /[\u0900-\u097f]/, // Devanagari
+    faces: '"Kohinoor Devanagari", "Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif',
+  },
+];
+const scriptOf = (text: string) => SCRIPTS.find(({ letters }) => letters.test(text));
+
 /** The same open, round-dot lettering as page titles, at an intro-specific scale. */
 function greetingGlyphs(pen: Pen, viewport: Size, family: string): Glyphs {
   const { cell, cols, rows, left, top } = greetingGridFor(viewport.width, viewport.height);
   let size = Math.min(240, viewport.height * 0.24, viewport.width * 0.16) / cell;
+  const fontFor = (text: string) => {
+    const script = scriptOf(text);
+    return script ? `700 ${size}px ${script.faces}` : `800 ${size}px ${family}`;
+  };
   pen.canvas.width = cols;
   pen.canvas.height = rows;
   pen.fillStyle = "#fff";
   pen.textAlign = "center";
   pen.textBaseline = "alphabetic";
-  pen.font = `800 ${size}px ${family}`;
   const words = GREETINGS.map(({ text }) => text.toUpperCase());
-  const longest = Math.max(...words.map((text) => pen.measureText(text).width));
+  const longest = Math.max(
+    ...words.map((text) => {
+      pen.font = fontFor(text);
+      return pen.measureText(text).width;
+    }),
+  );
   // Every language shares a cap height and baseline, without resizing per word.
   size *= Math.min(1, viewport.width * 0.78 / (longest * cell));
-  pen.font = `800 ${size}px ${family}`;
+  pen.font = fontFor("HELLO");
   const metrics = pen.measureText("HELLO");
   const baseline = (rows + metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
 
   return {
     greetings: words.map((text) => {
+      pen.font = fontFor(text);
+      let y = baseline;
+      if (scriptOf(text)) {
+        // Other scripts stand taller than capitals and sit differently: centre the word's own ink instead.
+        const own = pen.measureText(text);
+        y = (rows + own.actualBoundingBoxAscent - own.actualBoundingBoxDescent) / 2;
+      }
       pen.clearRect(0, 0, cols, rows);
-      pen.fillText(text, cols / 2, baseline);
+      pen.fillText(text, cols / 2, y);
       const pixels = pen.getImageData(0, 0, cols, rows).data;
       const dots: number[] = [];
       for (let i = 0; i < cols * rows; i++) {
