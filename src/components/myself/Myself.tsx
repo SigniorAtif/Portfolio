@@ -4,15 +4,12 @@ import { useRef } from "react";
 import Image from "next/image";
 import { Decode } from "@/components/motion/Text";
 import { SkeletonReveal, useLoadedMedia } from "@/components/ui/Skeleton";
+import { statement } from "@/content/about";
 import { gsap, inView, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { DUR, EASE } from "@/lib/motion";
 import { EXIT_AT, ToonStage } from "./ToonStage";
 
-// Draft copy, to polish later.
-const STATEMENT =
-  "I've been writing code since 2015, long before anyone asked me to. Mostly small, stubborn things: a planner that works with the wifi dead, tools that hand agents the boring half, and the desktop I'm typing this on. None of it is theoretical.";
-
-const words = STATEMENT.split(" ");
+const words = statement.split(" ");
 
 /** The picture the toons gather round, under /public: a cut-out, so the tile's dots show behind it. */
 const PICTURE = {
