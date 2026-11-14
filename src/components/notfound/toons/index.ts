@@ -28,10 +28,16 @@
 
 import { astronaut } from "./Astronaut";
 import { dino } from "./Dino";
+import { hexo } from "./Hexo";
+import { monsier } from "./Monsier";
+import { octo } from "./Octo";
+import { potion } from "./Potion";
+import { shapes } from "./Shapes";
+import { shrimp } from "./Shrimp";
 import { ufo } from "./UFO";
 import type { Toon, ToonId } from "./types";
 
 export type { Toon, ToonId };
 
-/** Add the other seven here as they are ported; the renderer needs nothing else. */
-export const toons: Toon[] = [ufo, astronaut, dino];
+/** Every character from the old portfolio. The mug is not here: it is the astronaut's prop (see AsciiMug). */
+export const toons: Toon[] = [ufo, astronaut, dino, hexo, monsier, octo, potion, shapes, shrimp];
