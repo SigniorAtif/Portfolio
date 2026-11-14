@@ -31,6 +31,12 @@ export function jumpTo(y: number) {
   else window.scrollTo(0, y);
 }
 
+/** Glide to a scroll position, through Lenis when it is running. */
+export function glideTo(y: number) {
+  if (lenis) lenis.scrollTo(y);
+  else window.scrollTo({ top: y, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
 export function lockScroll() {
   if (locked) return;
   locked = true;
