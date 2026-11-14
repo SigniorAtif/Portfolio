@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { PageLink } from "@/components/transition/PageLink";
 import { Sparks } from "@/components/about/Sparks";
 import { Footer } from "@/components/footer/Footer";
 import { FooterCurtain } from "@/components/footer/FooterCurtain";
@@ -56,7 +56,7 @@ export default function WorkPage() {
         {/* The page does not end on a list: two doors on. */}
         <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">
           <FadeUp each="cards" className="grid gap-3 sm:grid-cols-2">
-            <Link href="/about" className={door}>
+            <PageLink href="/about" className={door}>
               <span className="kicker">Next</span>
               <span className="text-[clamp(40px,6vw,96px)] font-medium leading-none tracking-[-0.04em]">
                 About
@@ -64,7 +64,7 @@ export default function WorkPage() {
                   ↗
                 </span>
               </span>
-            </Link>
+            </PageLink>
             <a href={`mailto:${site.email}`} className={door}>
               <span className="kicker">Say hello</span>
               <span className="mt-auto text-[clamp(22px,2.8vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] [overflow-wrap:anywhere]">

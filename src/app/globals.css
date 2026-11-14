@@ -1494,3 +1494,28 @@ body {
     letter-spacing: -0.035em;
   }
 }
+
+/* The veil: the loader and the page transition (components/transition/Veil).
+   The server sends it as a flat sheet of the ground colour, so the page never
+   shows before its loader; once the script is running the canvas paints instead. */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--ground);
+}
+
+.veil[data-live] {
+  background: transparent;
+}
+
+/* If the script never starts, the sheet lets go by itself. */
+.veil:not([data-live]) {
+  animation: veil-bail 0s linear 12s forwards;
+}
+
+@keyframes veil-bail {
+  to {
+    visibility: hidden;
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { whenStageOpen } from "@/lib/stage";
 
 const RING_PX = 56; // the loader ring the portrait's dots leave from
 const ASSEMBLE_S = 2.6;
@@ -54,6 +55,7 @@ export function DotText({ text, className, weight = 700, dots: target = 1500 }: 
     let frame = 0;
     let born = 0;
     let live = true;
+    let started = false;
 
     /** Render the text off screen and keep a dot for every lit grid point. */
     const sample = () => {
@@ -151,18 +153,20 @@ export function DotText({ text, className, weight = 700, dots: target = 1500 }: 
       const box = canvas.getBoundingClientRect();
       pointer.x = event.clientX - box.left;
       pointer.y = event.clientY - box.top;
-      if (reduced) draw(performance.now());
+      if (reduced && started) draw(performance.now());
     };
     const onResize = () => {
       sample();
-      if (reduced) draw(performance.now());
+      if (reduced && started) draw(performance.now());
     };
 
-    // The text must be measured in the real font, so wait for it.
-    void document.fonts.ready.then(() => {
+    // The text must be measured in the real font, so wait for it; and the dots
+    // only start once the veil is leaving, or they would assemble unseen.
+    void Promise.all([document.fonts.ready, whenStageOpen()]).then(() => {
       if (!live) return;
       sample();
       born = performance.now();
+      started = true;
       if (reduced) draw(born);
       else frame = requestAnimationFrame(loop);
     });

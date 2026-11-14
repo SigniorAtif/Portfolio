@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { isHomeIntro, trackLoad, whenStageOpen } from "@/lib/stage";
 
 const POSITION_RANGE = 1.25; // must match pack() in tools/bust/bake.py
 const RING_PX = 56;
@@ -11,6 +12,9 @@ const DOT_PX = 2.0; // sprite size at 800px stage height; the visible core is ab
 const FOV = 30;
 const DUST = 260;
 const IDLE_MS = 4000; // a still pointer hands the light back to the wander
+const ASSEMBLE_S = 2.6; // the dots' flight in from the ring
+// Returning home starts the intro this far in: assembled, the shine band gone.
+const SETTLED_MS = 5000;
 
 const bustVertex = /* glsl */ `
   attribute vec3 aNormal;
@@ -179,11 +183,6 @@ async function loadPoints(file: string, onProgress: (fraction: number) => void):
   return { count, positions, normals, flags, edges };
 }
 
-const RING_DOTS = Array.from({ length: 72 }, (_, i) => {
-  const angle = (i / 72) * Math.PI * 2 - Math.PI / 2;
-  return [+(RING_PX * Math.cos(angle)).toFixed(2), +(RING_PX * Math.sin(angle)).toFixed(2)] as const;
-});
-
 function randoms(count: number) {
   const out = new Float32Array(count * 3);
   for (let i = 0; i < out.length; i++) out[i] = Math.random();
@@ -195,8 +194,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lightRef = useRef<HTMLSpanElement>(null);
-  const [percent, setPercent] = useState(0);
-  const [phase, setPhase] = useState<"loading" | "assembling" | "ready" | "failed">("loading");
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -205,6 +203,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     if (!root || !canvas || !lightDot) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const homeIntro = isHomeIntro();
     const dotColour = new THREE.Color(getComputedStyle(root).getPropertyValue("--dot").trim() || "#ffffff");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true });
     const scene = new THREE.Scene();
@@ -296,13 +295,10 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
 
       if (assembleStart) {
         const elapsed = (now - assembleStart) / 1000;
-        uniforms.uAssemble.value = Math.min(elapsed / 2.6, 1);
+        uniforms.uAssemble.value = Math.min(elapsed / ASSEMBLE_S, 1);
         // One band of light slides down the bust once, then leaves.
         uniforms.uShine.value = 1.9 - Math.max(0, elapsed - 2.2) * 2.4;
-        if (elapsed > 2.6) {
-          setPhase("ready");
-          if (nextGlint === Infinity) nextGlint = now + 2400;
-        }
+        if (elapsed > ASSEMBLE_S && nextGlint === Infinity) nextGlint = now + 2400;
         if (now > nextGlint) {
           const g = (now - nextGlint) / 900;
           uniforms.uGlint.value = -0.4 + 0.8 * g;
@@ -350,7 +346,9 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     });
     watcher.observe(root);
 
-    loadPoints(file, (fraction) => setPercent(Math.round(fraction * 100)))
+    // The veil counts this download, and holds the stage shut until it is in.
+    const report = trackLoad();
+    loadPoints(file, report)
       .then(async ({ count, positions, normals, flags, edges }) => {
         if (disposed) return;
         const geometry = new THREE.BufferGeometry();
@@ -363,19 +361,19 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
         points.frustumCulled = false;
         scene.add(points);
 
-        setPercent(100);
-        if (!reduced) await new Promise((resolve) => setTimeout(resolve, 380)); // let 100% register
+        report(1);
+        // Returning home reveals the finished portrait. Only a direct home
+        // load assembles it from the loader's ring.
+        await whenStageOpen();
         if (disposed) return;
-        if (reduced) {
-          uniforms.uAssemble.value = 1;
-          setPhase("ready");
-        } else {
-          assembleStart = performance.now();
-          setPhase("assembling");
-        }
+        if (reduced) uniforms.uAssemble.value = 1;
+        else assembleStart = performance.now() - (homeIntro ? 0 : SETTLED_MS);
         frame = requestAnimationFrame(tick);
       })
-      .catch(() => setPhase("failed"));
+      .catch(() => {
+        report(1);
+        if (!disposed) setFailed(true);
+      });
 
     return () => {
       disposed = true;
@@ -395,7 +393,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
   }, [file]);
 
   return (
-    <div ref={rootRef} className="absolute inset-0">
+    <div ref={rootRef} data-bust className="absolute inset-0">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
       <p className="sr-only">A portrait of Atif Ahmed drawn in dots, wearing glasses.</p>
 
@@ -405,30 +403,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
         className="pointer-events-none absolute left-0 top-0 -ml-[3px] -mt-[3px] size-[6px] rounded-full bg-white opacity-0 shadow-[0_0_14px_4px_rgb(255_255_255/0.45)]"
       />
 
-      <div
-        className="pointer-events-none absolute inset-0 grid place-items-center transition-opacity duration-500"
-        style={{ opacity: phase === "loading" ? 1 : 0 }}
-        role="status"
-        aria-live="polite"
-      >
-        <svg
-          width={RING_PX * 2 + 8}
-          height={RING_PX * 2 + 8}
-          viewBox={`${-RING_PX - 4} ${-RING_PX - 4} ${RING_PX * 2 + 8} ${RING_PX * 2 + 8}`}
-          aria-hidden="true"
-          className="col-start-1 row-start-1"
-        >
-          {RING_DOTS.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={1.3} fill="var(--dot)" opacity={i / RING_DOTS.length < percent / 100 ? 1 : 0.2} />
-          ))}
-        </svg>
-        <span className="col-start-1 row-start-1 text-[28px] font-medium tabular-nums tracking-tight">
-          {percent}
-          <span className="text-muted">%</span>
-        </span>
-      </div>
-
-      {phase === "failed" && (
+      {failed && (
         <p className="absolute inset-0 grid place-items-center font-mono text-xs uppercase tracking-widest text-muted">
           Portrait could not load
         </p>
