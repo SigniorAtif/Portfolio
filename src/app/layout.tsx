@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
+import { ContextMenu } from "@/components/nav/ContextMenu";
 import { Veil } from "@/components/transition/Veil";
 import { site, socials } from "@/content/site";
 import "./globals.css";
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(person).replace(/</g, "\\u003c") }}
         />
         {children}
+        <ContextMenu />
         <Veil />
         {/* Without scripts nothing would ever lift the veil. */}
         <noscript>
