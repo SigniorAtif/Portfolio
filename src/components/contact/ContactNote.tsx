@@ -9,7 +9,7 @@ import { Decode } from "@/components/motion/Text";
 import { OnScreen } from "@/components/ui/OnScreen";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { personal } from "@/content/about";
-import { asks, deadlines, delivery, hints, moods, thanks, timeZone } from "@/content/contact";
+import { asks, deadlines, delivery, hints, moods, noteText, thanks, timeZone } from "@/content/contact";
 import { site, socials } from "@/content/site";
 import { sendNote } from "@/lib/sendNote";
 
@@ -115,7 +115,8 @@ export function ContactNote() {
   const missing = BLANKS.filter((id) => !filled[id]);
   const done = missing.length === 0;
 
-  const note = `Hi Atif, I'm ${text.name}. I'm making ${text.thing}. And I want ${asks[ask]}, ${deadlines[deadline]}. Reach me at ${text.email}.`;
+  const parts = { ...text, ask: asks[ask], deadline: deadlines[deadline] };
+  const note = noteText(parts);
 
   const firstName = text.name.split(" ")[0].slice(0, 16);
   const status = done
@@ -136,7 +137,7 @@ export function ContactNote() {
     try {
       // The castle gets its whole flight off the screen, however quick the sending is.
       const flight = wait(FLIGHT);
-      await sendNote({ ...text, ask: asks[ask], deadline: deadlines[deadline], text: note });
+      await sendNote(parts);
       await flight;
       setPhase("sent");
     } catch {
