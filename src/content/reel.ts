@@ -41,6 +41,25 @@ export const reel = {
   ] satisfies ReelChapter[],
 } as const;
 
+/** Width over height of the cut. The tile and the grown video both keep it. */
+export const REEL_ASPECT = 16 / 9;
+
+/**
+ * The grown video, inside a gutter all round. On a landscape screen it is the
+ * largest box of the reel's shape that fits, so the whole frame stays on
+ * screen (the cut sets type close to its edges). On a portrait screen it is
+ * the whole padded screen, with the video letterboxed in the middle
+ * (`portrait:object-contain`) and the caption below it. The work section's
+ * curtain opens on the same box.
+ */
+export function fitReel(width: number, height: number, gutter: number): { width: number; height: number } {
+  const w = Math.max(width - gutter * 2, 1);
+  const h = Math.max(height - gutter * 2, 1);
+  if (height >= width) return { width: w, height: h };
+  const fit = Math.min(w, h * REEL_ASPECT);
+  return { width: fit, height: fit / REEL_ASPECT };
+}
+
 export function timestamp(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }

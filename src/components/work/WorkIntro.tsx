@@ -6,7 +6,7 @@ import Image from "next/image";
 import { SpaceField } from "@/components/footer/SpaceField";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import type { Project } from "@/content/projects";
-import { reel } from "@/content/reel";
+import { fitReel, reel } from "@/content/reel";
 import { jumpTo, lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 import { projectHref } from "./Card";
@@ -108,8 +108,8 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
     if (!root || !scene) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // How the frame covers the screen before it closes.
-    const m = { cover: 1, dx: 0, dy: 0 };
+    // How the frame covers the screen before it closes, and where the grown reel sits.
+    const m = { cover: 1, dx: 0, dy: 0, holeX: 0, holeY: 0 };
     let phase: "idle" | "playing" | "done" = "idle";
     let startedAt = 0;
     let frame = 0;
@@ -118,6 +118,9 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
     const measure = () => {
       const width = root.clientWidth;
       const height = root.clientHeight;
+      const reelBox = fitReel(width, height, parseFloat(getComputedStyle(root).getPropertyValue("--gutter")) || 0);
+      m.holeX = (width - reelBox.width) / 2;
+      m.holeY = (height - reelBox.height) / 2;
       m.cover = Math.max(width / scene.offsetWidth, height / scene.offsetHeight) * 1.01;
       m.dx = width / 2 - (scene.offsetLeft + scene.offsetWidth / 2);
       m.dy = height / 2 - (scene.offsetTop + scene.offsetHeight / 2);
@@ -165,9 +168,9 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
       const curtain = curtainRef.current;
       const hole = holeRef.current;
       if (curtain && hole) {
-        const pad = parseFloat(getComputedStyle(hole).left) || 0;
-        const edge = pad + shut * (root.clientHeight / 2 - pad);
+        const edge = m.holeY + shut * (root.clientHeight / 2 - m.holeY);
         hole.style.top = hole.style.bottom = `${edge.toFixed(2)}px`;
+        hole.style.left = hole.style.right = `${m.holeX.toFixed(2)}px`;
         hole.style.display = shut >= 1 ? "none" : "block";
         curtain.style.background = shut >= 1 ? "var(--ground)" : "none";
         curtain.style.visibility = phase === "idle" ? "hidden" : "visible";
