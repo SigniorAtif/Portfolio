@@ -159,7 +159,7 @@ function Entry({ project }: { project: Project }) {
   );
 }
 
-function Media({ src }: { src: string }) {
+export function Media({ src }: { src: string }) {
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isVideo = /\.(mp4|webm)$/.test(src);
