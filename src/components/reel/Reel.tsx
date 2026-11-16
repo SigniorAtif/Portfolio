@@ -5,7 +5,7 @@ import Image from "next/image";
 import { motion } from "motion/react";
 import { Decode, Lines, Rise } from "@/components/motion/Text";
 import { SkeletonReveal, useLoadedMedia } from "@/components/ui/Skeleton";
-import { reel, timestamp } from "@/content/reel";
+import { fitReel, reel, timestamp } from "@/content/reel";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { reducedMotion } from "@/lib/motion";
 import { useReducedMotion } from "@/lib/useReducedMotion";
@@ -25,12 +25,13 @@ const clamp = (value: number) => Math.min(Math.max(value, 0), 1);
  * The showreel. At rest it is an ordinary composed section: a two-part
  * headline around a paragraph, a chapter list and the video as one small
  * tile. When the tile reaches the middle of the screen the section pins and
- * the tile grows until the video fills the viewport but for a gutter all
- * round, corners still rounded; the text slides out of its way. After a
- * short hold the next section scrolls up over it.
+ * the tile grows until it leaves only a gutter all round (`fitReel`), corners
+ * still rounded; the text slides out of its way. The whole frame stays in
+ * view at every screen shape. After a short hold the next section scrolls up
+ * over it.
  *
- * The video is laid out at viewport size from the start and only ever scaled
- * and clipped, so the picture is not resampled or distorted on the way.
+ * The video is laid out at its grown size from the start and only ever
+ * scaled, so the picture is not resampled or distorted on the way.
  */
 export function Reel() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -60,7 +61,7 @@ export function Reel() {
 
       const ease = gsap.parseEase("power2.inOut");
       // Everything the frame loop needs, measured on refresh.
-      const m = { vw: 1, vh: 1, s0: 1, insetX: 0, insetY: 0, radius: TILE_RADIUS, pad: 0, dx: 0, grow: 1, total: 1 };
+      const m = { vw: 1, vh: 1, s0: 1, insetX: 0, insetY: 0, dx: 0, grow: 1, total: 1 };
 
       /** Offset of the tile's centre inside the section, ignoring transforms and pinning. */
       const slotCentre = () => {
@@ -76,26 +77,26 @@ export function Reel() {
       const measure = () => {
         m.vw = document.documentElement.clientWidth;
         m.vh = window.innerHeight;
+        // The stage is laid out at its grown size, so grown it sits at scale 1.
+        // At rest it is scaled down until it just covers the tile, and the clip
+        // trims whatever sticks out past the tile (only the tall phone panel does).
+        const pad = parseFloat(getComputedStyle(section).paddingLeft) || 0;
+        const grown = fitReel(m.vw, m.vh, pad);
         const width = slot.offsetWidth;
         const height = slot.offsetHeight;
-        // Scale at which the viewport-sized stage just covers the tile; the
-        // clip then trims whatever sticks out past the tile's own shape.
-        m.s0 = Math.max(width / m.vw, height / m.vh);
-        m.insetX = (m.vw - width / m.s0) / 2;
-        m.insetY = (m.vh - height / m.s0) / 2;
-        m.radius = TILE_RADIUS / m.s0;
-        // Grown, the video stops one gutter short of every edge and keeps its corners.
-        m.pad = parseFloat(getComputedStyle(section).paddingLeft) || 0;
+        m.s0 = Math.max(width / grown.width, height / grown.height);
+        m.insetX = (grown.width - width / m.s0) / 2;
+        m.insetY = (grown.height - height / m.s0) / 2;
         const centre = slotCentre();
         m.dx = m.vw / 2 - centre.x;
         m.grow = (m.vw < 768 ? GROW_VH_PHONE : GROW_VH) * m.vh;
         m.total = m.grow + (HOLD_VH + COVER_VH) * m.vh;
 
         stage.dataset.takeover = "";
-        stage.style.width = `${m.vw}px`;
-        stage.style.height = `${m.vh}px`;
-        stage.style.marginLeft = `${-m.vw / 2}px`;
-        stage.style.marginTop = `${-m.vh / 2}px`;
+        stage.style.width = `${grown.width}px`;
+        stage.style.height = `${grown.height}px`;
+        stage.style.marginLeft = `${-grown.width / 2}px`;
+        stage.style.marginTop = `${-grown.height / 2}px`;
 
         // Pull the next section up so that it reaches the top of the screen
         // exactly as the pin lets go: it scrolls over the fixed video instead
@@ -107,8 +108,10 @@ export function Reel() {
       const apply = (progress: number) => {
         const g = ease(clamp((progress * m.total) / m.grow));
         const rest = 1 - g;
-        stage.style.transform = `translate3d(${(m.dx * g).toFixed(2)}px,0,0) scale(${(m.s0 + (1 - m.s0) * g).toFixed(5)})`;
-        stage.style.clipPath = `inset(${(m.insetY * rest + m.pad * g).toFixed(2)}px ${(m.insetX * rest + m.pad * g).toFixed(2)}px round ${(m.radius * rest + TILE_RADIUS * g).toFixed(2)}px)`;
+        const scale = m.s0 + (1 - m.s0) * g;
+        stage.style.transform = `translate3d(${(m.dx * g).toFixed(2)}px,0,0) scale(${scale.toFixed(5)})`;
+        // Corners keep the same radius on screen at every size.
+        stage.style.clipPath = `inset(${(m.insetY * rest).toFixed(2)}px ${(m.insetX * rest).toFixed(2)}px round ${(TILE_RADIUS / scale).toFixed(2)}px)`;
 
         // Text leaves along its own axis and is gone before the video gets there.
         const out = clamp(g / TEXT_GONE_AT);
@@ -276,7 +279,7 @@ export function Reel() {
                         preload="metadata"
                         poster={reel.poster}
                         controls={reduced}
-                        aria-label="Showreel: rury, Tasks, ruyah, Claude Code Connector, Pixan and QuExchange in use"
+                        aria-label="Showreel: rury, ruyah, the Claude Code Connector, QuExchange, Tasks, Pixan and gdgkiit.in in use"
                         className="h-full w-full object-cover portrait:object-contain"
                       >
                         {reel.sources.map((source) => (
@@ -300,10 +303,10 @@ export function Reel() {
                   ref={chromeRef}
                   className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-[calc(var(--gutter)*1.75)] opacity-0"
                 >
-                  <Decode as="p" className="kicker !text-ink">
+                  <Decode as="p" className="kicker min-w-0 rounded-full bg-ground/60 px-4 py-2 !text-ink backdrop-blur">
                     {caption}
                   </Decode>
-                  {hasVideo && (
+                  {hasVideo && reel.hasAudio && (
                     <button
                       type="button"
                       aria-pressed={!muted}
