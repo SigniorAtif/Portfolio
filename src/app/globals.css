@@ -372,7 +372,8 @@ body {
 .work-intro[data-phase="idle"] {
   pointer-events: none;
 }
-/* A sheet of ground with a hole the shape of the grown video. */
+/* A sheet of ground with a hole the shape of the grown video. The script
+   places the hole on the reel's grown box (`fitReel`) and closes it. */
 .work-curtain {
   position: absolute;
   inset: 0;

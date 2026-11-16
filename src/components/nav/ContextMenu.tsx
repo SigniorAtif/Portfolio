@@ -19,7 +19,7 @@ import { stageOpen } from "@/lib/stage";
 // The site's own right-click menu, on every page. Styles are `.cmenu` in globals.css.
 //
 // It opens where the pointer asked for it, spreading out from that point like
-// the veil does, and holds the pages, a few copies, and the link under the
+// the veil does, and holds the pages, a few copies, a refresh, and the link under the
 // pointer when there is one. The browser's menu stays one step away: Shift +
 // right-click, text fields, selected text, images and touch screens all get it
 // as before.
@@ -373,6 +373,9 @@ export function ContextMenu() {
             Back to top
           </button>
         )}
+        <button type="button" {...row} data-label="Refresh" onClick={() => window.location.reload()}>
+          Refresh
+        </button>
         {socials.map((social) => (
           <a
             key={social.href}
