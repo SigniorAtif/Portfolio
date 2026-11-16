@@ -11,27 +11,33 @@ export type ReelChapter = {
 export const reel = {
   /**
    * Set to false to drop the section (and its nav links) from the landing.
-   * Do that if the site goes live before the real reel is cut.
    */
   enabled: true,
   headline: ["Easier to show you", "than tell you."],
   intro:
-    "Half a minute of the things I've built, all of them running. It starts on the desktop I made and goes through what I wrote on it.",
+    "Under a minute of the things I've built, all of them running. It starts on the desktop I made and goes through what I wrote on it.",
   poster: "/reel/poster.webp",
-  /**
-   * Empty until the reel is cut. Then list `/reel/reel.webm` and
-   * `/reel/reel.mp4` here (best format first) and the tile starts playing.
-   */
-  sources: [] as { src: string; type: string }[],
-  /** Draft timings from the storyboard. Re-time against the final cut. */
+  /** Best format first. Cut in the sibling `portfolio-reel` HyperFrames project. */
+  sources: [
+    { src: "/reel/reel.webm", type: "video/webm" },
+    { src: "/reel/reel.mp4", type: "video/mp4" },
+  ] as { src: string; type: string }[],
+  /** The cut has no soundtrack yet. Set to true when one is added and the sound toggle comes back. */
+  hasAudio: false,
+  /** Timed against the final cut. */
   chapters: [
-    { at: 0, name: "rury", note: "lock screen into the desktop" },
-    { at: 5, name: "rury", note: "new wallpaper, the whole shell recolours" },
-    { at: 9, name: "Tasks", note: "an offline edit syncing" },
-    { at: 14, name: "ruyah", note: "two screens, one film, in step" },
-    { at: 19, name: "Connector", note: "Claude Code reading the open note" },
-    { at: 24, name: "Pixan, QuExchange", note: "quick cuts" },
-    { at: 29, name: "rury", note: "back to the desktop, lock" },
+    { at: 0, name: "Intro", note: "easier to show you than tell you" },
+    { at: 4, name: "rury", note: "new wallpaper, the whole shell recolours" },
+    { at: 8, name: "rury", note: "left and right panels" },
+    { at: 14, name: "rury", note: "the bar: hover anything, switch to boost" },
+    { at: 22, name: "ruyah", note: "two screens, one film, in step" },
+    { at: 26, name: "ruyah", note: "41 ms apart, measured" },
+    { at: 29, name: "Connector", note: "Claude Code reading the open note" },
+    { at: 33, name: "QuExchange", note: "a file as a deck of QR frames" },
+    { at: 36, name: "Tasks", note: "offline, then it syncs" },
+    { at: 38, name: "Pixan", note: "the landing page, as it loads" },
+    { at: 42, name: "GDG KIIT", note: "one build, desktop and phone" },
+    { at: 48, name: "Built with", note: "Next.js, Postgres, QML, Hyprland" },
   ] satisfies ReelChapter[],
 } as const;
 

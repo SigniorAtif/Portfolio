@@ -276,7 +276,7 @@ export function Reel() {
                         preload="metadata"
                         poster={reel.poster}
                         controls={reduced}
-                        aria-label="Showreel: rury, Tasks, ruyah, Claude Code Connector, Pixan and QuExchange in use"
+                        aria-label="Showreel: rury, ruyah, the Claude Code Connector, QuExchange, Tasks, Pixan and gdgkiit.in in use"
                         className="h-full w-full object-cover portrait:object-contain"
                       >
                         {reel.sources.map((source) => (
@@ -300,10 +300,10 @@ export function Reel() {
                   ref={chromeRef}
                   className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 p-[calc(var(--gutter)*1.75)] opacity-0"
                 >
-                  <Decode as="p" className="kicker !text-ink">
+                  <Decode as="p" className="kicker min-w-0 rounded-full bg-ground/60 px-4 py-2 !text-ink backdrop-blur">
                     {caption}
                   </Decode>
-                  {hasVideo && (
+                  {hasVideo && reel.hasAudio && (
                     <button
                       type="button"
                       aria-pressed={!muted}
