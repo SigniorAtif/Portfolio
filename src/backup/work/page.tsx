@@ -7,28 +7,29 @@ import { FadeUp } from "@/components/motion/FadeUp";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { Decode, Lines, Rise } from "@/components/motion/Text";
 import { SiteMark } from "@/components/nav/SiteMark";
-import { WorkGrid } from "@/components/work/WorkGrid";
+import { WorkIndex } from "@/backup/work/WorkIndex";
 import { featured } from "@/content/projects";
 import { site } from "@/content/site";
 
 export const metadata: Metadata = {
-  title: "Work, experimental",
-  description: "A grid layout for the work page, on trial.",
-  robots: { index: false, follow: false },
+  title: "Work",
+  description: "Every project by Atif Ahmed: what each one is, what it is built with, and where to open it.",
+  alternates: { canonical: "/work" },
 };
 
 const door =
   "group flex flex-col gap-4 rounded-[20px] border border-line p-[clamp(20px,2.4vw,36px)] transition-colors duration-300 ease-[var(--ease-hover)] hover:border-ink";
 
 /**
- * The work page as a grid, on trial next to the list at /work. Not linked from
- * anywhere and kept out of the index.
+ * Backup of the old work page (the filterable list), replaced at /work by the
+ * grid. Outside `src/app`, so it is not a route; to bring it back, move this
+ * file to `src/app/work/page.tsx`.
  */
-export default function WorkExperimentalPage() {
+export default function WorkPage() {
   return (
     <SmoothScroll>
       <Sparks />
-      <SiteMark page="/work-experimental" />
+      <SiteMark page="/work" />
       <main>
         <section
           id="top"
@@ -37,7 +38,7 @@ export default function WorkExperimentalPage() {
         >
           <div className="flex flex-col gap-4">
             <Decode as="p" className="kicker">
-              Work / Experimental
+              Work / Index
             </Decode>
             <h1 id="work-title" className="flex items-start gap-[0.12em] text-[clamp(56px,11vw,176px)] font-medium leading-[0.92] tracking-[-0.045em]">
               <Rise as="span" at={1}>
@@ -51,7 +52,7 @@ export default function WorkExperimentalPage() {
           </Lines>
         </section>
 
-        <WorkGrid projects={featured} />
+        <WorkIndex projects={featured} />
 
         {/* The page does not end on a list: two doors on. */}
         <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">
