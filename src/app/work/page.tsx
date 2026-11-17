@@ -7,7 +7,7 @@ import { FadeUp } from "@/components/motion/FadeUp";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { Decode, Lines, Rise } from "@/components/motion/Text";
 import { SiteMark } from "@/components/nav/SiteMark";
-import { WorkIndex } from "@/components/work/WorkIndex";
+import { WorkGrid } from "@/components/work/WorkGrid";
 import { featured } from "@/content/projects";
 import { site } from "@/content/site";
 
@@ -21,7 +21,7 @@ const door =
   "group flex flex-col gap-4 rounded-[20px] border border-line p-[clamp(20px,2.4vw,36px)] transition-colors duration-300 ease-[var(--ease-hover)] hover:border-ink";
 
 /**
- * The work index: every project as a full entry on one page. Home has the
+ * The work index: every project as one ruled row on one page. Home has the
  * show (the wheel); this page is for reading.
  */
 export default function WorkPage() {
@@ -51,7 +51,7 @@ export default function WorkPage() {
           </Lines>
         </section>
 
-        <WorkIndex projects={featured} />
+        <WorkGrid projects={featured} />
 
         {/* The page does not end on a list: two doors on. */}
         <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { FadeUp } from "@/components/motion/FadeUp";
-import { SkeletonReveal, useLoadedMedia } from "@/components/ui/Skeleton";
 import { SwapLabel } from "@/components/ui/SwapLabel";
+import { Media } from "@/components/work/Media";
 import type { Project } from "@/content/projects";
 import { ScrollTrigger } from "@/lib/gsap";
 import { jumpTo } from "@/lib/scrollLock";
@@ -156,32 +155,6 @@ function Entry({ project }: { project: Project }) {
         </div>
       </FadeUp>
     </li>
-  );
-}
-
-function Media({ src }: { src: string }) {
-  const imageRef = useRef<HTMLImageElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const isVideo = /\.(mp4|webm)$/.test(src);
-  const loaded = useLoadedMedia(isVideo ? videoRef : imageRef);
-
-  return (
-    <SkeletonReveal loaded={loaded} className="h-full w-full">
-      {isVideo ? (
-        <video ref={videoRef} src={src} muted loop playsInline autoPlay className="h-full w-full object-cover" />
-      ) : (
-        <Image
-          ref={imageRef}
-          src={src}
-          alt=""
-          width={540}
-          height={960}
-          sizes="(min-width: 640px) 256px, 240px"
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-      )}
-    </SkeletonReveal>
   );
 }
 
