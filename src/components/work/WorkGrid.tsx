@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { FadeUp } from "@/components/motion/FadeUp";
-import { Media } from "@/components/work/WorkIndex";
+import { Media } from "@/components/work/Media";
 import type { Project } from "@/content/projects";
 
 const two = (n: number) => String(n).padStart(2, "0");
