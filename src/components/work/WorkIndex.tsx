@@ -159,7 +159,8 @@ function Entry({ project }: { project: Project }) {
   );
 }
 
-export function Media({ src }: { src: string }) {
+/** `sizes` defaults to the capture on this page (16rem, 15rem on phones); pass the drawn width where it is smaller. */
+export function Media({ src, sizes = "(min-width: 640px) 256px, 240px" }: { src: string; sizes?: string }) {
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isVideo = /\.(mp4|webm)$/.test(src);
@@ -176,7 +177,7 @@ export function Media({ src }: { src: string }) {
           alt=""
           width={540}
           height={960}
-          sizes="(min-width: 640px) 256px, 240px"
+          sizes={sizes}
           loading="lazy"
           className="h-full w-full object-cover"
         />

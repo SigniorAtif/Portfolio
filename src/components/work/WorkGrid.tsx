@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { FadeUp } from "@/components/motion/FadeUp";
 import { Media } from "@/components/work/WorkIndex";
 import type { Project } from "@/content/projects";
@@ -11,15 +11,13 @@ const chip =
 /** One cell of a row. The row's gaps show the line colour, so every cell paints the ground back. */
 const cell = "flex min-w-0 flex-col gap-5 bg-ground p-[clamp(18px,1.6vw,24px)]";
 
-/** Column tracks at full width, by cell. Rows without numbers or a capture simply have fewer. */
-const TRACK = {
-  // Wide enough for the longest single word in a name ("QuExchange") and the longest kicker on one line.
-  name: "minmax(0, 15rem)",
-  what: "minmax(0, 5fr)",
-  how: "minmax(0, 6fr)",
-  numbers: "minmax(0, 5fr)",
-  media: "13rem",
-};
+/**
+ * The tracks from xl up: name, what it is, how it works, what it measured, capture.
+ * Every row has all five, so the rules line up down the page. The name track is
+ * wide enough for the longest single word in a name ("QuExchange") and the longest
+ * kicker on one line; the capture track holds the w-44 phone and its padding.
+ */
+const tracks = "xl:grid-cols-[15rem_minmax(0,9fr)_minmax(0,10fr)_minmax(0,10fr)_13rem]";
 
 type Link = { href: string; label: string; says: string };
 
@@ -64,7 +62,8 @@ export function WorkGrid({ projects }: { projects: Project[] }) {
             One row per project, read left to right. The numbers come from each project&apos;s own tests or docs.
           </p>
         </FadeUp>
-        <ol className="flex flex-col gap-3">
+        {/* From xl up every row takes the height of the tallest, so the stack reads as one set. */}
+        <ol className="flex flex-col gap-3 xl:grid xl:auto-rows-fr">
           {projects.map((project) => (
             <li key={project.slug} id={project.slug} className="scroll-mt-24">
               <Row project={project} />
@@ -89,19 +88,20 @@ function Label({ children }: { children: ReactNode }) {
 function Row({ project }: { project: Project }) {
   const links = linksOf(project);
   const [lead, ...rest] = project.facts;
-  const tracks = [TRACK.name, TRACK.what, TRACK.how, lead && TRACK.numbers, project.media && TRACK.media].filter(Boolean).join(" ");
-  // In the two-column sizes the cells pair up: the name with what it is, how it works
-  // with the numbers or else the capture. A cell left without a partner spans both
-  // columns, so no empty slot shows the line colour.
-  const wide = "md:col-span-2 xl:col-span-1";
+  // From xl up a missing column is taken by the cell to its left: how it works runs
+  // on into the numbers' track, the numbers into the capture's. In the two-column
+  // sizes the cells pair up (the name with what it is, how it works with the numbers
+  // or else the capture), and a cell left without a partner spans both. Either way
+  // no empty slot shows the line colour.
+  const howSpan = lead ? "" : project.media ? "xl:col-span-2" : "md:col-span-2 xl:col-span-3";
+  const numbersSpan = project.media ? "" : "xl:col-span-2";
+  const mediaSpan = lead ? "md:col-span-2 xl:col-span-1" : "";
 
   return (
-    <FadeUp>
-      {/* The grid sits inside FadeUp so it can carry its own tracks: two columns in the middle sizes, the full run from xl up.
-          The height floor clears a capture (the w-44 phone and its padding), so rows with and without one match. */}
+    <FadeUp className="h-full">
+      {/* The height floor clears a capture (the w-44 phone and its padding), so rows with and without one match. */}
       <div
-        style={{ "--tracks": tracks } as CSSProperties}
-        className="grid gap-px overflow-hidden rounded-[20px] border border-line bg-line transition-colors duration-300 ease-[var(--ease-hover)] hover:border-line-strong md:grid-cols-2 xl:min-h-[clamp(352px,25vw,400px)] xl:[grid-template-columns:var(--tracks)]"
+        className={`grid h-full gap-px overflow-hidden rounded-[20px] border border-line bg-line transition-colors duration-300 ease-[var(--ease-hover)] hover:border-line-strong has-[:focus-visible]:border-line-strong md:grid-cols-2 xl:min-h-[clamp(352px,25vw,400px)] ${tracks}`}
       >
         <div className={cell}>
           <p className="kicker tabular-nums">
@@ -131,9 +131,10 @@ function Row({ project }: { project: Project }) {
           <p className="text-[clamp(21px,1.75vw,27px)] font-medium leading-[1.2] tracking-[-0.02em]">{project.oneLiner}</p>
         </div>
 
-        <div className={`${cell} ${lead || project.media ? "" : wide}`}>
+        <div className={`${cell} ${howSpan}`}>
           <Label>How it works</Label>
-          <p className="text-[16px] leading-[1.55] text-body">{project.summary}</p>
+          {/* Capped for the rows where this cell runs on across an empty track. */}
+          <p className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
           <ul className="flex flex-wrap gap-1.5">
             {project.stack.map((item) => (
               <li key={item} className={chip}>
@@ -145,32 +146,34 @@ function Row({ project }: { project: Project }) {
         </div>
 
         {lead && (
-          <div className={cell}>
+          <div className={`${cell} @container ${numbersSpan}`}>
             <Label>What it measured</Label>
-            {/* A container, so the lesser facts take two columns only where their phrase labels have room. */}
-            <dl className="@container flex flex-col gap-5">
-              <div className="flex flex-col-reverse gap-2">
+            {/* The lead fact runs across the top. The cell is a container, so the lesser facts take two
+                columns only where their phrase labels have room; an odd one out at the end takes the
+                full width rather than sit beside an empty half. */}
+            <dl className="grid gap-x-4 @[13rem]:grid-cols-2">
+              <div className={`col-span-full flex flex-col-reverse gap-2 ${rest.length ? "pb-5" : ""}`}>
                 <dt className="text-[13px] leading-[1.4] text-muted">{lead.label}</dt>
                 <dd className="text-[clamp(48px,4.4vw,68px)] font-medium leading-none tracking-[-0.04em]">{lead.value}</dd>
               </div>
-              {rest.length > 0 && (
-                <div className="grid gap-x-4 @[18rem]:grid-cols-2">
-                  {rest.map((fact) => (
-                    <div key={fact.label} className="flex flex-col-reverse justify-end gap-1.5 border-t border-line py-3">
-                      <dt className="text-[13px] leading-[1.4] text-muted">{fact.label}</dt>
-                      <dd className="text-[clamp(22px,1.9vw,28px)] font-medium leading-none tracking-[-0.03em]">{fact.value}</dd>
-                    </div>
-                  ))}
+              {rest.map((fact, index) => (
+                <div
+                  key={fact.label}
+                  className={`flex flex-col-reverse justify-end gap-1.5 border-t border-line py-3 ${rest.length % 2 && index === rest.length - 1 ? "col-span-full" : ""}`}
+                >
+                  <dt className="text-[13px] leading-[1.4] text-muted">{fact.label}</dt>
+                  <dd className="text-[clamp(22px,1.9vw,28px)] font-medium leading-none tracking-[-0.03em]">{fact.value}</dd>
                 </div>
-              )}
+              ))}
             </dl>
           </div>
         )}
 
         {project.media && (
-          <div className={`dot-plate grid place-items-center p-4 ${lead ? wide : ""}`}>
+          <div className={`dot-plate grid place-items-center p-4 ${mediaSpan}`}>
             <div className="aspect-[9/16] w-44 max-w-full overflow-hidden rounded-[14px] border border-line-strong bg-ground">
-              <Media src={project.media} />
+              {/* The phone is w-44 at every size, so ask for an image that wide and no wider. */}
+              <Media src={project.media} sizes="176px" />
             </div>
           </div>
         )}
