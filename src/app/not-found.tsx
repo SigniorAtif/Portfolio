@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 const links = [
   { label: "Back home", href: "/" },
-  { label: "Work", href: "/#work" },
+  { label: "Work", href: "/work" },
 ];
 
 const button =
