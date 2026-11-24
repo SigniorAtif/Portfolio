@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { isHomeIntro, trackLoad, whenStageOpen } from "@/lib/stage";
+import { isHomeIntro, stageOpen, trackLoad, whenStageOpen } from "@/lib/stage";
 
 const POSITION_RANGE = 1.25; // must match pack() in tools/bust/bake.py
 const RING_PX = 56;
@@ -401,9 +401,13 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
           return;
         }
 
+        // The veil stops waiting for a slow download. Points that land after it
+        // has lifted assemble all the same, but fade in rather than appear.
+        const late = stageOpen();
         report(1);
         await whenStageOpen();
         if (disposed) return;
+        if (late) canvas.animate({ opacity: [0, 1] }, { duration: 700, easing: "ease-out" });
         assembleStart = performance.now();
         frame = requestAnimationFrame(tick);
       })

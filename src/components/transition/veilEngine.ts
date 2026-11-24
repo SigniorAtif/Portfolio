@@ -13,6 +13,9 @@ const BAND = 0.4; // width of the ripple's soft edge, as a share of its reach
 const RING_PX = 56; // the ring the portrait's dots leave from (BustStage)
 const RING_S = 1.05;
 const GIVE_UP_MS = 8000;
+// How long the first load holds its last word for downloads still under way.
+// After that the page opens anyway and the portrait fades in when it lands.
+const LOAD_PATIENCE_MS = 500;
 // The frame the greetings light: the dots outside a rounded box around the words.
 const FRAME_X = 0.78; // the box's half-width, as a share of half the viewport
 const FRAME_Y = 0.68;
@@ -327,9 +330,9 @@ export function createEngine(
         greetingAge -= GREETINGS[greetingIndex].ms;
         greetingIndex++;
       }
-      // A slow download holds the last word; it never restarts the greeting cycle.
-      const finished = waited >= (plain ? 200 : BOOT_MS * pace);
-      if (!asked && finished && (real >= 0.999 || waited >= GIVE_UP_MS)) {
+      // A slow download holds the last word, briefly; it never restarts the greeting cycle.
+      const finishAt = plain ? 200 : BOOT_MS * pace;
+      if (!asked && waited >= finishAt && (real >= 0.999 || waited >= finishAt + LOAD_PATIENCE_MS)) {
         asked = true;
         emit({ type: "full" });
       }
