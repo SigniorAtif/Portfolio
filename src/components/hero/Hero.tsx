@@ -124,7 +124,7 @@ export function Hero() {
 
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-ground from-40% to-transparent px-[var(--gutter)] pb-10 pt-24 text-xl sm:bottom-auto sm:bg-none sm:py-0 sm:top-1/2 sm:-translate-y-1/2 sm:flex-row sm:justify-between sm:text-2xl"
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-ground from-40% to-transparent px-[var(--gutter)] pb-10 pt-24 text-xl sm:text-2xl lg:bottom-auto lg:bg-none lg:py-0 lg:top-1/2 lg:-translate-y-1/2 lg:flex-row lg:justify-between"
           style={{ opacity: "calc(1 - var(--p) * 3)" }}
         >
           <span>Atif Ahmed</span>
@@ -132,7 +132,7 @@ export function Hero() {
         </div>
         <p
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-6 hidden text-center font-mono text-[11px] uppercase tracking-[0.3em] text-muted [@media(hover:hover)]:block"
+          className="pointer-events-none absolute inset-x-0 bottom-6 hidden text-center font-mono text-[11px] uppercase tracking-[0.3em] text-muted lg:[@media(hover:hover)]:block"
           style={{ opacity: "calc(1 - var(--p) * 3)" }}
         >
           Move the light
