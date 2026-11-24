@@ -1746,6 +1746,261 @@ body {
   }
 }
 
+/* ---------- builds: agent cursors put /work together (components/build) ---------- */
+/* The cursors fly over the whole build stage and never catch a press. */
+.build-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: clip;
+  pointer-events: none;
+}
+.build-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  color: var(--c);
+  will-change: transform;
+}
+.build-cursor > svg {
+  position: absolute;
+  display: none;
+  overflow: visible;
+}
+.build-cursor[data-shape="arrow"] > [data-shape="arrow"],
+.build-cursor[data-shape="cross"] > [data-shape="cross"],
+.build-cursor[data-shape="beam"] > [data-shape="beam"] {
+  display: block;
+}
+/* What a block draws while it is built: marquees, handles, the size pill. */
+.build-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.build-marquee {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  border: 1px solid var(--progress);
+  background: color-mix(in srgb, var(--progress) 9%, transparent);
+}
+.build-hollow,
+.build-marquee.is-settled {
+  background: none;
+}
+.build-marquee.is-settled > .build-size {
+  display: none;
+}
+.build-marquee > i {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--progress);
+  background: var(--ink);
+}
+/* Handles and the pill follow the marquee's size by transform, so a growing
+   marquee never counts as a layout shift. */
+.build-marquee > i:nth-child(2) {
+  transform: translateX(var(--w));
+}
+.build-marquee > i:nth-child(3) {
+  transform: translateY(var(--h));
+}
+.build-marquee > i:nth-child(4) {
+  transform: translate(var(--w), var(--h));
+}
+/* A frame's outline and hairlines as they are drawn; the frame itself takes over once the block is built. */
+.build-outline {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+}
+.build-rule {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--line);
+}
+/* Typing: the line being typed is selected, and the caret takes its agent's colour. */
+.build-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  background: color-mix(in srgb, var(--progress) 32%, transparent);
+}
+.build-caret {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+}
+.build-size {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(calc(var(--w) / 2), calc(var(--h) + 8px)) translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--progress);
+  color: var(--ground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* A cursor's name tag: what its agent is working on, in the agent's colour. */
+.build-tag {
+  position: absolute;
+  left: 13px;
+  top: 19px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--c);
+  color: var(--ground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.build-tag:empty {
+  display: none;
+}
+.build-cursor[data-think] > .build-tag {
+  animation: build-think 0.45s ease-in-out infinite alternate;
+}
+.build-cursor[data-think] > .build-tag::after {
+  content: " …";
+}
+@keyframes build-think {
+  to {
+    opacity: 0.55;
+  }
+}
+/* The ring a click leaves. */
+.build-ripple {
+  position: absolute;
+  left: -12px;
+  top: -12px;
+  width: 24px;
+  height: 24px;
+  visibility: hidden;
+  border: 1.5px solid var(--progress);
+  border-radius: 50%;
+}
+/* Placeholder bars where text is about to go. */
+.build-skel {
+  position: absolute;
+  overflow: hidden;
+  opacity: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.build-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 11%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: build-shimmer 1.4s ease-in-out infinite;
+}
+.build-skel.is-pill {
+  border-radius: 8px;
+}
+@keyframes build-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+/* Dashed column guides, dropped where the hairlines will go. */
+.build-guide {
+  position: absolute;
+  visibility: hidden;
+}
+.build-guide.is-down {
+  width: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--progress) 60%, transparent);
+}
+.build-guide.is-across {
+  height: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--progress) 60%, transparent);
+}
+/* Guides from a corner being dragged, across the whole block. */
+.build-smart {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+}
+.build-smart.is-down {
+  width: 0;
+  border-left: 1px solid color-mix(in srgb, var(--progress) 32%, transparent);
+}
+.build-smart.is-across {
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--progress) 32%, transparent);
+}
+/* The pen going round a frame's outline. */
+.build-trace {
+  position: absolute;
+  overflow: visible;
+  visibility: hidden;
+}
+.build-trace > rect {
+  fill: none;
+  stroke: var(--progress);
+  stroke-width: 1;
+}
+/* A capture's upload, over its empty phone. */
+.build-upload {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 120px;
+  padding: 8px 10px;
+  visibility: hidden;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--ground);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.build-upload > b {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+.build-upload > b > i {
+  display: block;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: var(--progress);
+}
+
 /* The veil: the loader and the page transition (components/transition/Veil).
    The server sends it as a flat sheet of the ground colour, so the page never
    shows before its loader; once the script is running the canvas paints instead. */

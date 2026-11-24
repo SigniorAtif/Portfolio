@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Build } from "@/components/build/Build";
 import { FadeUp } from "@/components/motion/FadeUp";
 import { Media } from "@/components/work/Media";
 import type { Project } from "@/content/projects";
@@ -78,9 +79,9 @@ export function WorkGrid({ projects }: { projects: Project[] }) {
 /** A cell's label, with a rule running out to the cell's edge. */
 function Label({ children }: { children: ReactNode }) {
   return (
-    <p className="kicker flex items-center gap-3">
+    <p data-type className="kicker flex items-center gap-3">
       {children}
-      <span aria-hidden="true" className="h-px grow bg-line" />
+      <span aria-hidden="true" data-rule className="h-px grow bg-line" />
     </p>
   );
 }
@@ -98,18 +99,19 @@ function Row({ project }: { project: Project }) {
   const mediaSpan = lead ? "md:col-span-2 xl:col-span-1" : "";
 
   return (
-    <FadeUp className="h-full">
+    <Build className="h-full">
       {/* The height floor clears a capture (the w-44 phone and its padding), so rows with and without one match. */}
       <div
+        data-frame
         className={`grid h-full gap-px overflow-hidden rounded-[20px] border border-line bg-line transition-colors duration-300 ease-[var(--ease-hover)] hover:border-line-strong has-[:focus-visible]:border-line-strong md:grid-cols-2 xl:min-h-[clamp(352px,25vw,400px)] ${tracks}`}
       >
-        <div className={cell}>
-          <p className="kicker tabular-nums">
+        <div data-box className={cell}>
+          <p data-type className="kicker tabular-nums">
             {two(project.order)} <span className="px-1.5">/</span> {project.kind}
           </p>
           <div className="mt-auto flex flex-col gap-3 pt-6">
-            <h3 className="text-[clamp(26px,2.1vw,32px)] font-medium leading-[1.02] tracking-[-0.03em] [overflow-wrap:anywhere]">{project.name}</h3>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-[0.12em]">
+            <h3 data-pick className="text-[clamp(26px,2.1vw,32px)] font-medium leading-[1.02] tracking-[-0.03em] [overflow-wrap:anywhere]">{project.name}</h3>
+            <div data-show className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-[0.12em]">
               {links.length ? (
                 links.map((link) => (
                   <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`${project.name}: ${link.says}`} className="link-line hit py-1">
@@ -126,32 +128,32 @@ function Row({ project }: { project: Project }) {
           </div>
         </div>
 
-        <div className={cell}>
+        <div data-box className={cell}>
           <Label>What it is</Label>
-          <p className="text-[clamp(21px,1.75vw,27px)] font-medium leading-[1.2] tracking-[-0.02em]">{project.oneLiner}</p>
+          <p data-type className="text-[clamp(21px,1.75vw,27px)] font-medium leading-[1.2] tracking-[-0.02em]">{project.oneLiner}</p>
         </div>
 
-        <div className={`${cell} ${howSpan}`}>
+        <div data-box className={`${cell} ${howSpan}`}>
           <Label>How it works</Label>
           {/* Capped for the rows where this cell runs on across an empty track. */}
-          <p className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
-          <ul className="flex flex-wrap gap-1.5">
+          <p data-type className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
+          <ul data-chips className="flex flex-wrap gap-1.5">
             {project.stack.map((item) => (
-              <li key={item} className={chip}>
-                {item}
+              <li key={item} data-chip className={chip}>
+                <span>{item}</span>
               </li>
             ))}
           </ul>
-          {project.credit && <p className="mt-auto font-mono text-[12px] tracking-[0.04em] text-muted">{project.credit}</p>}
+          {project.credit && <p data-type className="mt-auto font-mono text-[12px] tracking-[0.04em] text-muted">{project.credit}</p>}
         </div>
 
         {lead && (
-          <div className={`${cell} @container ${numbersSpan}`}>
+          <div data-box className={`${cell} @container ${numbersSpan}`}>
             <Label>What it measured</Label>
             {/* The lead fact runs across the top. The cell is a container, so the lesser facts take two
                 columns only where their phrase labels have room; an odd one out at the end takes the
                 full width rather than sit beside an empty half. */}
-            <dl className="grid gap-x-4 @[13rem]:grid-cols-2">
+            <dl data-type className="grid gap-x-4 @[13rem]:grid-cols-2">
               <div className={`col-span-full flex flex-col-reverse gap-2 ${rest.length ? "pb-5" : ""}`}>
                 <dt className="text-[13px] leading-[1.4] text-muted">{lead.label}</dt>
                 <dd className="text-[clamp(48px,4.4vw,68px)] font-medium leading-none tracking-[-0.04em]">{lead.value}</dd>
@@ -170,7 +172,7 @@ function Row({ project }: { project: Project }) {
         )}
 
         {project.media && (
-          <div className={`dot-plate grid place-items-center p-4 ${mediaSpan}`}>
+          <div data-box className={`dot-plate grid place-items-center p-4 ${mediaSpan}`}>
             <div className="aspect-[9/16] w-44 max-w-full overflow-hidden rounded-[14px] border border-line-strong bg-ground">
               {/* The phone is w-44 at every size, so ask for an image that wide and no wider. */}
               <Media src={project.media} sizes="176px" />
@@ -178,6 +180,6 @@ function Row({ project }: { project: Project }) {
           </div>
         )}
       </div>
-    </FadeUp>
+    </Build>
   );
 }
