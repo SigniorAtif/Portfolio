@@ -5,6 +5,7 @@ import { PageLink } from "@/components/transition/PageLink";
 import { Decode } from "@/components/motion/Text";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
+import { viewportHeight } from "@/lib/viewport";
 
 export type Strand = { title: string; text: string; projects: { slug: string; name: string }[] };
 
@@ -27,7 +28,7 @@ export function AboutStrands({ strands }: { strands: Strand[] }) {
       mm.add("(min-width: 900px) and (prefers-reduced-motion: no-preference)", () => {
         section.dataset.track = "";
         const travel = () => Math.max(0, track.scrollWidth - window.innerWidth);
-        const size = () => (section.style.height = `${window.innerHeight + travel()}px`);
+        const size = () => (section.style.height = `${viewportHeight() + travel()}px`);
         size();
         ScrollTrigger.addEventListener("refreshInit", size);
 

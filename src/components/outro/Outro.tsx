@@ -4,6 +4,7 @@ import { useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { quotes } from "@/content/quotes";
 import { gsap, ScrollTrigger, SplitText, useGSAP } from "@/lib/gsap";
+import { viewportHeight } from "@/lib/viewport";
 
 /** Share of the section's scroll spent travelling sideways. The rest shrinks the line to fit. */
 const TRAVEL = 0.75;
@@ -99,7 +100,7 @@ export function Outro({ id }: { id: string }) {
           section.style.height = `calc(100svh + ${Math.round(size.run / TRAVEL / SPEED)}px)`;
 
           // Resting place over the footer: the middle of the strip it leaves, or off the top.
-          const vh = window.innerHeight;
+          const vh = viewportHeight();
           const height = line.offsetHeight * size.fit;
           const strip = vh - footer.offsetHeight;
           const rest = strip >= height + GAP * 2 ? strip / 2 : -height;

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { nav } from "@/content/site";
 import { gsap, SplitText } from "@/lib/gsap";
 import { DUR, EASE, STAGGER, reducedMotion, staggerFor } from "@/lib/motion";
+import { onViewportChange, viewportHeight } from "@/lib/viewport";
 import { BustStage } from "./BustStage";
 import { FRAMED_AT, heroProgress } from "./progress";
 
@@ -59,7 +60,7 @@ export function Hero() {
     let frame = 0;
     const update = () => {
       frame = 0;
-      const viewport = window.innerHeight;
+      const viewport = viewportHeight();
       const { p } = heroProgress(track);
       const below = parseFloat(getComputedStyle(pin).getPropertyValue("--below-px")) || viewport * 0.3;
       pin.style.setProperty("--p", p.toFixed(4));
@@ -85,12 +86,12 @@ export function Hero() {
     };
     measure();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", measure);
+    const stopViewport = onViewportChange(measure);
     return () => {
       cancelAnimationFrame(frame);
       split?.revert();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", measure);
+      stopViewport();
     };
   }, []);
 

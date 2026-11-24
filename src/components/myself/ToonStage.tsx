@@ -7,6 +7,7 @@ import { CoffeeMugSvg } from "@/components/notfound/toons/CoffeeMug";
 import { DINO_SONGS, DinoSvg, animateDino, randomDinoMood } from "@/components/notfound/toons/Dino";
 import { LongBeamUfoSvg, ufo } from "@/components/notfound/toons/UFO";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
+import { viewportHeight } from "@/lib/viewport";
 
 const random = gsap.utils.random;
 
@@ -103,7 +104,7 @@ export function ToonStage({ drift }: { drift: RefObject<number> }) {
         const exit = { at: 0 };
         const exitTo = gsap.quickTo(exit, "at", { duration: 0.6, ease: "power3", onUpdate: () => void exitTl?.progress(exit.at) });
         const track = () => {
-          const vh = window.innerHeight;
+          const vh = viewportHeight();
           const top = tile ? tile.getBoundingClientRect().top - held.offsetTop : 0;
           // The exit runs on where the section's parts are on screen, not on the scroll's
           // number: the section moves them itself. It starts as their middle passes EXIT_AT
@@ -168,13 +169,13 @@ export function ToonStage({ drift }: { drift: RefObject<number> }) {
         // past the screen's and its bottom 10vh under it; the mug's (a quarter of that)
         // grew x4 against the left edge, 8rem down.
         const leave = (name: string) => stage.querySelector<HTMLElement>(`[data-leave="${name}"]`)!;
-        const unit = () => (window.innerWidth <= 568 ? window.innerHeight : window.innerWidth) * 0.2;
+        const unit = () => (window.innerWidth <= 568 ? viewportHeight() : window.innerWidth) * 0.2;
         const box = (name: string) => leave(name).closest<HTMLElement>(".toon")!; // laid out by CSS, never moved by this timeline
         // Measured up from the stage's bottom edge: a refresh can land while the footer has
         // <main> transformed, when the stage is as tall as <main> and its top is far off screen.
         const centre = (el: HTMLElement) => ({
           x: el.offsetLeft + el.offsetWidth / 2,
-          y: window.innerHeight - (stage.offsetHeight - el.offsetTop - el.offsetHeight / 2),
+          y: viewportHeight() - (stage.offsetHeight - el.offsetTop - el.offsetHeight / 2),
         });
         const timeline = (exitTl = gsap
           .timeline({ paused: true, defaults: { duration: 1, ease: LEAVING } })
@@ -184,7 +185,7 @@ export function ToonStage({ drift }: { drift: RefObject<number> }) {
             leave("astronaut"),
             {
               x: () => window.innerWidth - centre(box("astronaut")).x,
-              y: () => window.innerHeight * 1.1 - unit() / 2 - centre(box("astronaut")).y,
+              y: () => viewportHeight() * 1.1 - unit() / 2 - centre(box("astronaut")).y,
               // The canvas is 1.44 times as wide as the astronaut in it.
               scale: () => (unit() * 4 * 1.44) / box("astronaut").offsetWidth,
             },

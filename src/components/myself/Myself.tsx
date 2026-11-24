@@ -7,6 +7,7 @@ import { SkeletonReveal, useLoadedMedia } from "@/components/ui/Skeleton";
 import { statement } from "@/content/about";
 import { gsap, inView, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { DUR, EASE } from "@/lib/motion";
+import { viewportHeight } from "@/lib/viewport";
 import { EXIT_AT, ToonStage } from "./ToonStage";
 
 const words = statement.split(" ");
@@ -149,7 +150,7 @@ export function Myself() {
           // Off while the page is measured, so other triggers (the kicker's decode) see the layout.
           for (const el of movers) el.style.transform = "";
           section.dataset.pace = ""; // lets go of the sticky picture, see globals.css
-          const vh = (m.vh = window.innerHeight);
+          const vh = (m.vh = viewportHeight());
           const natural = grid.offsetTop + grid.offsetHeight + parseFloat(getComputedStyle(section).paddingBottom);
           // Full speed until the middle of the statement and picture reaches the band's lower
           // edge, then ZONE of a screen of travel slowed down, then full speed again.
