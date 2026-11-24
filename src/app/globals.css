@@ -1385,6 +1385,13 @@ body {
   letter-spacing: -0.05em;
   color: var(--line-strong);
 }
+/* Below desktop widths the name is sized to the frame it starts in (56vw,
+   with the name at 1.3x), so the grow never begins with it clipped. */
+@media (max-width: 1023px) {
+  .about-desk-name {
+    font-size: 19vw;
+  }
+}
 .about-desk-caption {
   display: flex;
   flex-wrap: wrap;
