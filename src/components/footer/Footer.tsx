@@ -45,7 +45,7 @@ export async function Footer() {
       <div className="mx-auto max-w-[90rem] px-[clamp(1rem,4vw,3rem)] pt-[clamp(2rem,3.5vw,3.5rem)] [&_.kicker]:text-[10px]">
         <div className="flex items-center gap-4">
           <span className="kicker !text-ink">End //</span>
-          <a href="#top" className="text-[15px] font-semibold tracking-tight">
+          <a href="#top" className="hit text-[15px] font-semibold tracking-tight">
             {site.name}.
           </a>
           <span aria-hidden="true" className="h-px flex-1 bg-line-strong" />
@@ -56,17 +56,17 @@ export async function Footer() {
           <div className="grid content-start justify-items-start gap-5">
             <p className="kicker">Say hello</p>
             <p className="text-[clamp(1.625rem,1rem+3.6vw,4rem)] font-semibold leading-[0.98] tracking-[-0.035em] [overflow-wrap:anywhere]">
-              <a href={`mailto:${site.email}`} className="link-line">
+              <a href={`mailto:${site.email}`} className="link-line hit">
                 {site.email}
                 <span aria-hidden="true" className="arrow">
                   ↗
                 </span>
               </a>
             </p>
-            <ul className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-sm tracking-[0.06em] text-muted">
+            <ul className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-sm tracking-[0.06em] text-muted touch:gap-y-[26px]">
               {socials.map((link) => (
                 <li key={link.href}>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hover:text-ink">
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hit hover:text-ink">
                     <SwapLabel>{link.label}</SwapLabel>
                     <span aria-hidden="true" className="arrow">
                       ↗

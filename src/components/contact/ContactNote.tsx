@@ -328,16 +328,16 @@ export function ContactNote() {
           <div className="flex flex-col gap-2">
             <dt className="kicker">Or skip the note</dt>
             <dd className="text-[clamp(18px,1.6vw,24px)]">
-              <a href={`mailto:${site.email}`} className="link-line">
+              <a href={`mailto:${site.email}`} className="link-line hit">
                 <SwapLabel>{site.email}</SwapLabel>
               </a>
             </dd>
           </div>
           <div className="flex flex-col gap-2">
             <dt className="kicker">Elsewhere</dt>
-            <dd className="flex flex-wrap gap-x-6 gap-y-1 text-[clamp(18px,1.6vw,24px)]">
+            <dd className="flex flex-wrap gap-x-6 gap-y-1 text-[clamp(18px,1.6vw,24px)] touch:gap-y-[17px]">
               {[...socials, ...personal].map((link) => (
-                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="link-line">
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hit">
                   <SwapLabel>{link.label}</SwapLabel>
                   <span aria-hidden="true" className="arrow">
                     ↗

@@ -68,7 +68,7 @@ export function AboutContact({ kicker = "07 / Say hello" }: { kicker?: string })
           aria-label={site.email}
           onPointerMove={wave}
           onPointerLeave={rest}
-          className="about-email"
+          className="about-email hit"
         >
           {site.email.split("").map((char, i) => (
             <span key={i} data-char aria-hidden="true">
@@ -83,10 +83,10 @@ export function AboutContact({ kicker = "07 / Say hello" }: { kicker?: string })
             { x: "97%", y: "62%", size: 10 },
           ]}
         />
-        <ul className="flex flex-wrap gap-x-7 gap-y-2 font-mono text-sm tracking-[0.06em] text-muted">
+        <ul className="flex flex-wrap gap-x-7 gap-y-2 font-mono text-sm tracking-[0.06em] text-muted touch:gap-y-[26px]">
           {[...socials, ...personal].map((link) => (
             <li key={link.href}>
-              <a href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hover:text-ink">
+              <a href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hit hover:text-ink">
                 <SwapLabel>{link.label}</SwapLabel>
                 <span aria-hidden="true" className="arrow">
                   ↗

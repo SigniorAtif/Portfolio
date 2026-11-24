@@ -69,7 +69,7 @@ export function AboutDesk() {
 
         <div className="about-desk-caption px-[var(--gutter)]">
           <p className="max-w-[34rem] text-[18px] leading-[1.45] text-body">{rury?.summary}</p>
-          <PageLink href="/work#rury" className="kicker whitespace-nowrap !text-ink">
+          <PageLink href="/work#rury" className="hit kicker whitespace-nowrap !text-ink">
             See rury<span className="arrow">↗</span>
           </PageLink>
         </div>

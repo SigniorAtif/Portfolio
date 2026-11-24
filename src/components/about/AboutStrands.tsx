@@ -68,10 +68,10 @@ export function AboutStrands({ strands }: { strands: Strand[] }) {
               <div className="flex flex-col gap-6">
                 <h3 className="text-[clamp(40px,6.4vw,104px)] font-medium leading-[0.96] tracking-[-0.04em]">{strand.title}</h3>
                 <p className="max-w-[32rem] text-[18px] leading-[1.5] text-body">{strand.text}</p>
-                <ul className="flex flex-wrap gap-x-7 gap-y-2 pt-2 text-[18px]">
+                <ul className="flex flex-wrap gap-x-7 gap-y-2 pt-2 text-[18px] touch:gap-y-[17px]">
                   {strand.projects.map((project) => (
                     <li key={project.slug}>
-                      <PageLink href={`/work#${project.slug}`} className="link-line inline-flex items-baseline text-body hover:text-ink">
+                      <PageLink href={`/work#${project.slug}`} className="link-line hit inline-flex items-baseline text-body hover:text-ink">
                         <SwapLabel>{project.name}</SwapLabel>
                         <span aria-hidden="true" className="arrow text-sm text-muted">
                           ↗
