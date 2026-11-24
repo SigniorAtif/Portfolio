@@ -19,8 +19,8 @@ const BUILD_QUERY = "(hover: hover) and (pointer: fine) and (min-width: 900px)";
 /**
  * A cursor build starts when its block's top crosses this share of the
  * screen, a little above the house reveal line, so the cursors start once the
- * visitor is scrolling. A block already on screen when the page opens is part
- * of the page they land on and is simply there, never built in front of them.
+ * visitor is scrolling. A block already on screen when the page opens waits
+ * empty for the visitor's first scroll, and starts then.
  */
 const BUILD_LINE = 0.7;
 
@@ -643,6 +643,18 @@ export class Conductor {
   /** Fade-ups wait for the house reveal line; cursor builds for the build line. */
   private entering: IntersectionObserver | null = null;
   private building: IntersectionObserver | null = null;
+  /** Builds on screen when the page opened, waiting for the first scroll. */
+  private early: Block[] = [];
+  private scrolledFrom = 0;
+  private readonly onFirstScroll = () => {
+    if (window.scrollY === this.scrolledFrom) return;
+    window.removeEventListener("scroll", this.onFirstScroll);
+    const at = now();
+    this.early.forEach((block, order) => {
+      if (block.state === "pending") this.start(block, at + order * T.block);
+    });
+    this.early = [];
+  };
   private seen: IntersectionObserver | null = null;
   private ticking = false;
   private readonly tick = () => this.frame();
@@ -739,6 +751,10 @@ export class Conductor {
     const line = (share: number) => ({ rootMargin: `0px 0px -${Math.round((1 - share) * 100)}% 0px` });
     this.entering = new IntersectionObserver(enter, line(IN_VIEW));
     this.building = new IntersectionObserver(enter, line(BUILD_LINE));
+    // A page opened part way down (a link to a project, a restored position) has
+    // been moved already, so what is on screen then builds straight away.
+    this.scrolledFrom = window.scrollY;
+    if (this.scrolledFrom <= 0) window.addEventListener("scroll", this.onFirstScroll, { passive: true });
     this.watch([...this.blocks.values()]);
   }
 
@@ -751,6 +767,8 @@ export class Conductor {
     this.seen = null;
     this.entering = null;
     this.opened = false;
+    this.early = [];
+    window.removeEventListener("scroll", this.onFirstScroll);
     this.stop();
     for (const cursor of this.cursors) cursor.el.remove();
     this.cursors = [];
@@ -760,19 +778,22 @@ export class Conductor {
 
   /**
    * Fade-ups on screen when the page opens start with it, top to bottom; the
-   * rest wait to enter. A cursor build on screen then is shown finished, and
-   * the rest wait for the build line.
+   * rest wait to enter. A cursor build on screen then waits for the first
+   * scroll, or starts at once on a page opened part way down; the rest wait
+   * for the build line.
    */
   private watch(blocks: Block[]) {
     let order = 0;
     const at = now();
+    const waiting = this.scrolledFrom <= 0 && window.scrollY === this.scrolledFrom;
     for (const block of blocks) {
       if (block.state !== "pending") continue;
       const r = block.el.getBoundingClientRect();
       const shown = r.top < window.innerHeight && r.bottom > 0;
       if (block.mode === "build") {
-        if (shown) this.finish(block);
-        else this.building?.observe(block.el);
+        if (!shown) this.building?.observe(block.el);
+        else if (waiting) this.early.push(block);
+        else this.start(block, at + T.open + order++ * T.block);
         continue;
       }
       if (shown) this.start(block, at + T.open + order++ * T.block);
