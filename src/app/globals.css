@@ -85,6 +85,34 @@ body {
   }
 }
 
+/* Phones and tablets: anything driven by a finger rather than a pointer. */
+@custom-variant touch {
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+
+/*
+ * A thumb-sized hit area. On a touch screen a small link or button catches
+ * taps across at least 44 by 44px, centred on it, and looks no different.
+ * It makes the element its own positioning box, so it is for links and
+ * buttons that are not positioned already.
+ */
+@utility hit {
+  @media (pointer: coarse) {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      translate: -50% -50%;
+    }
+  }
+}
+
 /* Mono uppercase label that opens every section and tags small facts. */
 @utility kicker {
   font-family: var(--font-code), monospace;
