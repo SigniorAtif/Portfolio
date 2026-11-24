@@ -831,6 +831,38 @@ body {
 .site-mark-links a:is(:hover, :focus-visible, [aria-current="page"]) {
   color: var(--ink);
 }
+/* By touch the chip is the one way round the site, so it is made for a thumb:
+   the name and the links catch taps across 44px, the whole folded chip opens
+   it, and the chip is near opaque, so text passing under it never shows. */
+@media (pointer: coarse) {
+  .site-mark-name {
+    position: relative;
+  }
+  .site-mark-name::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+  /* Folded, the name stops being the box its hit area is placed in, so the
+     hit area fills the chip instead. */
+  .site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name {
+    position: static;
+  }
+  .site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name::after {
+    top: 0;
+    left: 0;
+    width: max(100%, 44px);
+    height: 100%;
+    translate: none;
+  }
+  .site-mark-bar::before {
+    background: color-mix(in srgb, var(--ground) 86%, transparent);
+  }
+}
 /* Unfolded past the hero: the whole page behind the bar blurs and sinks
    towards the ground colour, so the name and links are all there is to read. */
 .site-mark-frost {
