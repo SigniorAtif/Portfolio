@@ -137,10 +137,10 @@ function Row({ project }: { project: Project }) {
           <Label>How it works</Label>
           {/* Capped for the rows where this cell runs on across an empty track. */}
           <p data-type className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
-          <ul data-type className="flex flex-wrap gap-1.5">
+          <ul data-chips className="flex flex-wrap gap-1.5">
             {project.stack.map((item) => (
-              <li key={item} className={chip}>
-                {item}
+              <li key={item} data-chip className={chip}>
+                <span>{item}</span>
               </li>
             ))}
           </ul>
