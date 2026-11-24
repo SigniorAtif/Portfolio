@@ -1918,6 +1918,9 @@ body {
   transform: translateX(-100%);
   animation: build-shimmer 1.4s ease-in-out infinite;
 }
+.build-skel.is-pill {
+  border-radius: 8px;
+}
 @keyframes build-shimmer {
   to {
     transform: translateX(100%);

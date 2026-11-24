@@ -43,6 +43,7 @@ const T = {
   rule: 0.3, // a label's rule, end to end
   divider: 0.32, // a hairline between two boxes, end to end
   pick: 0.36, // a name held in its selection box
+  chip: 0.26, // a chip's marquee, corner to corner
   show: 0.26, // links fade in
   ripple: 0.42, // the ring a click leaves
   upload: 1.05, // a capture's upload bar, empty to full
@@ -341,12 +342,12 @@ function rhythm(el: HTMLElement, total: number): { keys: number[]; weight: numbe
  * Grey placeholder bars where text is about to go, shimmering from the moment
  * its box fills until the text arrives. Typing eats them as the caret passes.
  */
-function placeholders(overlay: HTMLElement, at: Rect, pieces: Piece[]) {
+function placeholders(overlay: HTMLElement, at: Rect, pieces: Piece[], shape: "text" | "pill" = "text") {
   const bars = pieces.map((piece) => {
     const el = document.createElement("div");
-    el.className = "build-skel";
+    el.className = shape === "pill" ? "build-skel is-pill" : "build-skel";
     const height = piece.bottom - piece.top;
-    const bar = Math.max(5, Math.min(18, Math.round(height * 0.5)));
+    const bar = shape === "pill" ? height : Math.max(5, Math.min(18, Math.round(height * 0.5)));
     el.style.left = `${at.x + piece.left}px`;
     el.style.top = `${at.y + piece.top + (height - bar) / 2}px`;
     el.style.width = `${piece.right - piece.left}px`;
@@ -369,6 +370,10 @@ function placeholders(overlay: HTMLElement, at: Rect, pieces: Piece[]) {
         bar.el.style.visibility = cut >= width ? "hidden" : "";
         bar.el.style.clipPath = cut > 0 && cut < width ? `inset(0 0 0 ${cut}px)` : "";
       }
+    },
+    /** Shows or takes away the bars of one line alone. */
+    toggle(line: number, shown: boolean) {
+      for (const bar of bars) if (bar.piece.line === line) bar.el.style.visibility = shown ? "" : "hidden";
     },
   };
 }
@@ -532,7 +537,7 @@ const SPILL = 48;
  * the cursor's colour, and at the end the clip, selection and caret go. Until
  * the caret reaches it, the text's place is held by shimmering bars.
  */
-function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, { lines, pieces }: { lines: Line[]; pieces: Piece[] }) {
+function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, { lines, pieces }: { lines: Line[]; pieces: Piece[] }, bars = true) {
   const mark = document.createElement("div");
   mark.className = "build-mark";
   const caret = document.createElement("div");
@@ -540,7 +545,7 @@ function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, { lines, pieces 
   overlay.append(mark, caret);
   const total = lines.reduce((sum, line) => sum + line.chars, 0);
   const { keys, weight } = rhythm(el, total);
-  const held = placeholders(overlay, at, pieces);
+  const held = placeholders(overlay, at, bars ? pieces : []);
 
   /** How many characters are down at progress `p`. */
   const typedAt = (p: number) => {
@@ -825,7 +830,7 @@ export class Conductor {
     const rects = boxes.map((el) => relative(el, box));
     const frame = frameOf(block.el);
     const boxesAt = frame ? at + T.plan : at;
-    const jobs: Job[] = boxes.map((el, index) => this.boxJob(block, overlay, box, el, rects[index], boxesAt + index * T.box));
+    const jobs: Job[] = boxes.flatMap((el, index) => this.boxJob(block, overlay, box, el, rects[index], boxesAt + index * T.box));
     // When the last box has filled in.
     const filled = boxesAt + Math.max(0, boxes.length - 1) * T.box + T.arrive + T.think + T.drag + T.fill;
 
@@ -942,10 +947,12 @@ export class Conductor {
    * marquee out with guides following the corner, and lets go; the box fills
    * in with grey bars where its text will go. Then, in reading order, it types
    * each text over its bars, rules each label, holds each name in a selection
-   * box and lets the links appear; a capture is uploaded and drawn in. Typing
-   * is sped up for a long box so all of it, flight in aside, fits in `T.most`.
+   * box and lets the links appear; a capture is uploaded and drawn in. A
+   * second agent builds a box's chips meanwhile, each one dragged out, filled
+   * and labelled. Typing is sped up for a long box, and the chips with it, so
+   * all of it, flight in aside, fits in `T.most`.
    */
-  private boxJob(block: Block, overlay: HTMLElement, box: DOMRect, el: HTMLElement, r: Rect, start: number): Job {
+  private boxJob(block: Block, overlay: HTMLElement, box: DOMRect, el: HTMLElement, r: Rect, start: number): Job[] {
     const drawn = marquee(overlay);
     const guides = smartGuides(overlay, box.width, box.height);
     const corner = { x: r.x, y: r.y };
@@ -966,7 +973,16 @@ export class Conductor {
     const held = new Map(
       work.filter((piece) => piece.kind === "pick" || piece.kind === "show").map((piece) => [piece.part, placeholders(overlay, piece.at, layoutOf(piece.part).pieces)]),
     );
-    const bars = [...typed.map((text) => text.held), ...held.values()];
+    // Chips hold their places as grey pills until the chip agent gets to them.
+    const chips = Array.from(el.querySelectorAll<HTMLElement>("[data-chip]"));
+    const chipRects = chips.map((chip) => relative(chip, box));
+    const pills = placeholders(
+      overlay,
+      { x: 0, y: 0, w: 0, h: 0 },
+      chipRects.map((c, index) => ({ left: c.x, right: c.x + c.w, top: c.y, bottom: c.y + c.h, chars: 1, line: index })),
+      "pill",
+    );
+    const bars = [...typed.map((text) => text.held), ...held.values(), pills];
 
     const steps: Step[] = [
       { at: thought, dur: T.think, think: true, apply: () => {}, point: () => corner },
@@ -1121,8 +1137,85 @@ export class Conductor {
         cursorAt += T.show;
       }
     }
-    steps.push({ at: Math.max(filled + T.fill, cursorAt), dur: T.release, apply: (p) => drawn.fade(1 - p) });
-    return this.job(block, role, start, corner, steps);
+    const helpers: Job[] = [];
+    if (chips.length) helpers.push(this.chipJob(block, overlay, box, chips, chipRects, pills, filled));
+    const done = Math.max(filled + T.fill, cursorAt, ...helpers.map((job) => job.free));
+    steps.push({ at: done, dur: T.release, apply: (p) => drawn.fade(1 - p) });
+    return [this.job(block, role, start, corner, steps), ...helpers];
+  }
+
+  /**
+   * A box's chips, built by their own agent while the box's agent types: each
+   * chip's marquee is dragged out over its grey pill, the chip's outline comes
+   * in, and its label is typed inside. Starts as the box fills, and is paced
+   * to end within `T.most` of the box's marquee starting out.
+   */
+  private chipJob(
+    block: Block,
+    overlay: HTMLElement,
+    box: DOMRect,
+    chips: HTMLElement[],
+    rects: Rect[],
+    pills: ReturnType<typeof placeholders>,
+    filled: number,
+  ): Job {
+    const labels = chips.map((chip) => {
+      const text = (chip.firstElementChild as HTMLElement | null) ?? chip;
+      return typer(overlay, text, relative(text, box), layoutOf(text), false);
+    });
+    const corners = rects.map((c) => ({ x: c.x, y: c.y }));
+    const natural = labels.reduce((sum, label, index) => sum + (index ? T.hop : 0) + T.chip + T.hop / 2 + label.weight / T.typing, 0);
+    const room = Math.max(0.6, T.most - T.drag - T.fill - T.release - T.think);
+    const pace = natural > room ? room / natural : 1;
+
+    const begin = filled + T.fill;
+    const steps: Step[] = [{ at: begin, dur: T.think, think: true, apply: () => {}, point: () => corners[0] }];
+    let cursorAt = begin + T.think;
+    let from = corners[0];
+    const hopTo = (to: Point, shape: Shape, dur: number) => {
+      const hop = from;
+      steps.push({ at: cursorAt, dur, shape, apply: () => {}, point: (p) => lerp(hop, to, easeInOut(p)) });
+      cursorAt += dur;
+      from = to;
+    };
+    chips.forEach((chip, index) => {
+      const c = rects[index];
+      const label = labels[index];
+      const drawnChip = marquee(overlay, "band");
+      if (index) hopTo(corners[index], "cross", T.hop * pace);
+      const drag = T.chip * pace;
+      steps.push(
+        { at: cursorAt, dur: T.ripple, apply: ripple(overlay, corners[index]) },
+        {
+          at: cursorAt,
+          dur: drag,
+          shape: "cross",
+          press: true,
+          apply: (p) => drawnChip.draw(c, easeOut(p)),
+          point: (p) => ({ x: c.x + c.w * easeOut(p), y: c.y + c.h * easeOut(p) }),
+        },
+        // The chip's own outline takes the pill's place as the marquee lets go.
+        {
+          at: cursorAt + drag,
+          dur: T.release,
+          apply: (p) => {
+            chip.style.opacity = p >= 1 ? "" : String(p);
+            pills.toggle(index, p <= 0);
+          },
+        },
+      );
+      cursorAt += drag;
+      from = { x: c.x + c.w, y: c.y + c.h };
+      hopTo(label.point(0), "beam", (T.hop / 2) * pace);
+      const typing = (label.weight / T.typing) * pace;
+      steps.push(
+        { at: cursorAt, dur: typing, shape: "beam", apply: label.apply, point: label.point },
+        { at: cursorAt + typing, dur: T.release, apply: (p) => drawnChip.fade(1 - p) },
+      );
+      cursorAt += typing;
+      from = label.point(1);
+    });
+    return this.job(block, "stack", filled, corners[0], steps);
   }
 
   private job(block: Block, role: string, start: number, first: Point | null, steps: Step[]): Job {
@@ -1167,7 +1260,7 @@ export class Conductor {
     block.overlay = null;
     block.jobs = [];
     block.state = "done";
-    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule], [data-type], [data-pick], [data-show], [data-box] img, [data-box] video"), frameOf(block.el)]) {
+    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule], [data-type], [data-pick], [data-show], [data-chip], [data-chip] > span, [data-box] img, [data-box] video"), frameOf(block.el)]) {
       if (el && !el.getAttribute("style")) el.removeAttribute("style");
     }
     this.entering?.unobserve(block.el);
