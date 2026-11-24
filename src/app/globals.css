@@ -1746,6 +1746,84 @@ body {
   }
 }
 
+/* ---------- builds: agent cursors put /work together (components/build) ---------- */
+/* The cursors fly over the whole build stage and never catch a press. */
+.build-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: clip;
+  pointer-events: none;
+}
+.build-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  color: var(--c);
+  will-change: transform;
+}
+.build-cursor > svg {
+  position: absolute;
+  display: none;
+  overflow: visible;
+}
+.build-cursor[data-shape="arrow"] > [data-shape="arrow"],
+.build-cursor[data-shape="cross"] > [data-shape="cross"],
+.build-cursor[data-shape="beam"] > [data-shape="beam"] {
+  display: block;
+}
+/* What a block draws while it is built: marquees, handles, the size pill. */
+.build-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.build-marquee {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  border: 1px solid var(--progress);
+  background: color-mix(in srgb, var(--progress) 9%, transparent);
+}
+.build-marquee > i {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--progress);
+  background: var(--ink);
+}
+/* Handles and the pill follow the marquee's size by transform, so a growing
+   marquee never counts as a layout shift. */
+.build-marquee > i:nth-child(2) {
+  transform: translateX(var(--w));
+}
+.build-marquee > i:nth-child(3) {
+  transform: translateY(var(--h));
+}
+.build-marquee > i:nth-child(4) {
+  transform: translate(var(--w), var(--h));
+}
+.build-size {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(calc(var(--w) / 2), calc(var(--h) + 8px)) translateX(-50%);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--progress);
+  color: var(--ground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* The veil: the loader and the page transition (components/transition/Veil).
    The server sends it as a flat sheet of the ground colour, so the page never
    shows before its loader; once the script is running the canvas paints instead. */
