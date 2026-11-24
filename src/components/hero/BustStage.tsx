@@ -298,6 +298,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     let frame = 0;
     let disposed = false;
     let visible = true;
+    let running = false; // the loop has started: the points are in and the stage is open
     let assembleStart = 0;
     let last = performance.now();
     let nextGlint = Infinity;
@@ -308,8 +309,12 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     const light = { x: -0.45, y: 0.6 }; // stage coordinates, -1..1
 
     const tick = (now: number) => {
+      // Off screen the loop stops altogether; the watcher below restarts it.
+      if (!visible) {
+        frame = 0;
+        return;
+      }
       frame = requestAnimationFrame(tick);
-      if (!visible) return;
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       uniforms.uTime.value = now / 1000;
@@ -369,6 +374,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     const watcher = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       last = performance.now();
+      if (visible && running && !frame) frame = requestAnimationFrame(tick);
     });
     watcher.observe(root);
 
@@ -396,6 +402,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
           if (reduced) uniforms.uAssemble.value = 1;
           else assembleStart = performance.now() - SETTLED_MS;
           settle = true;
+          running = true;
           tick(performance.now());
           report(1);
           return;
@@ -409,6 +416,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
         if (disposed) return;
         if (late) canvas.animate({ opacity: [0, 1] }, { duration: 700, easing: "ease-out" });
         assembleStart = performance.now();
+        running = true;
         frame = requestAnimationFrame(tick);
       })
       .catch(() => {
