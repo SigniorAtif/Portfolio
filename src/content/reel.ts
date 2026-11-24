@@ -17,11 +17,17 @@ export const reel = {
   intro:
     "Under a minute of the things I've built, all of them running. It starts on the desktop I made and goes through what I wrote on it.",
   poster: "/reel/poster.webp",
-  /** Best format first. Cut in the sibling `portfolio-reel` HyperFrames project. */
+  /**
+   * The browser takes the first one it can play whose `media` matches, so
+   * phones (narrow, or short when held sideways) get a 720p cut at a third
+   * of the weight. It is H.264 only: at that bitrate VP9 smears the small type
+   * in the QR scene. Cut in the sibling `portfolio-reel` HyperFrames project.
+   */
   sources: [
+    { src: "/reel/reel-720.mp4", type: "video/mp4", media: "(max-width: 767px), (max-height: 500px)" },
     { src: "/reel/reel.webm", type: "video/webm" },
     { src: "/reel/reel.mp4", type: "video/mp4" },
-  ] as { src: string; type: string }[],
+  ] as { src: string; type: string; media?: string }[],
   /** The cut has no soundtrack yet. Set to true when one is added and the sound toggle comes back. */
   hasAudio: false,
   /** Timed against the final cut. */

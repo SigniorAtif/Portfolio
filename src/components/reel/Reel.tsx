@@ -383,7 +383,7 @@ export function Reel() {
                         className="h-full w-full object-cover"
                       >
                         {reel.sources.map((source) => (
-                          <source key={source.src} src={source.src} type={source.type} />
+                          <source key={source.src} src={source.src} type={source.type} media={source.media} />
                         ))}
                       </video>
                     ) : (
