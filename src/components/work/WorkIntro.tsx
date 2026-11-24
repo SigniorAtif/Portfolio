@@ -8,7 +8,9 @@ import { SwapLabel } from "@/components/ui/SwapLabel";
 import type { Project } from "@/content/projects";
 import { fitReel, reel } from "@/content/reel";
 import { jumpTo, lockScroll, unlockScroll } from "@/lib/scrollLock";
+import { useMedia } from "@/lib/useMedia";
 import { useReducedMotion } from "@/lib/useReducedMotion";
+import { viewportHeight } from "@/lib/viewport";
 import { projectHref } from "./Card";
 import type { DeckDrive } from "./Deck";
 import { SwapText } from "./SwapText";
@@ -43,6 +45,9 @@ const RADIUS = 28;
 const VIDEO_RADIUS = 20; // the reel's corners, as it leaves them
 const SLIGHT = 0.06; // share of a screen scrolled past the grown video before the page is held
 const START_KEYS = new Set(["ArrowDown", "PageDown", " ", "End"]);
+// Touch screens: the scroll drives the opening instead of a clock.
+const SCROLL_SCREENS = 2.2; // scroll spent on the opening, in screen heights
+const SETTLE = 0.88; // share of that scroll by which the frame has closed; the rest holds it
 
 const inOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -72,9 +77,14 @@ type Props = {
  *
  * The frame is laid out at its final place from the start. Until it closes
  * it is only scaled up to cover the screen, so nothing is re-laid-out on the way.
+ *
+ * Touch screens scroll natively, a frame ahead of script, and a held page
+ * fights the finger. There the stage is sticky inside a taller track and the
+ * scroll itself drives the deal, forwards and back; the page is never held.
  */
 export function WorkIntro({ projects, backdrop, autoplay = false, handoff = false, onFocusChange }: Props) {
-  const rootRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const skyRef = useRef<HTMLDivElement>(null);
   const cloudsRef = useRef<HTMLDivElement>(null);
@@ -91,6 +101,10 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
   const [announce, setAnnounce] = useState("");
   const [played, setPlayed] = useState(false);
   const settled = useReducedMotion() || played;
+  const scrubbed = useMedia("(pointer: coarse)");
+  const portrait = useMedia("(orientation: portrait)");
+  // The handoff needs the reel's takeover underneath it, and only the timed opening plays it.
+  const over = handoff && !portrait && !scrubbed;
 
   const onFocus = useCallback(
     (index: number, byUser: boolean) => {
@@ -213,12 +227,12 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
     // The opening only starts from a scroll made while the stage fills the screen.
     const inPlace = () => Math.abs(root.getBoundingClientRect().top) < window.innerHeight * 0.3;
     const onWheel = (event: WheelEvent) => {
-      if (handoff || phase !== "idle" || event.deltaY <= 0 || !inPlace()) return;
+      if (over || phase !== "idle" || event.deltaY <= 0 || !inPlace()) return;
       event.preventDefault();
       start();
     };
     const onTouch = () => {
-      if (!handoff && phase === "idle" && inPlace()) start();
+      if (!over && phase === "idle" && inPlace()) start();
     };
     // A scroll that came some other way (scrollbar, script) still starts it, while the stage is mostly on screen.
     let scrolledTo = window.scrollY;
@@ -227,7 +241,7 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
       scrolledTo = window.scrollY;
       if (phase !== "idle") return;
       const box = root.getBoundingClientRect();
-      if (handoff) {
+      if (over) {
         // The stage's top edge enters at the bottom of the screen just as the video finishes growing,
         // so a little further is the cue. Met from below instead, it is simply already open.
         if (down && box.top <= window.innerHeight * (1 - SLIGHT) && box.bottom > window.innerHeight * 0.5) start();
@@ -235,7 +249,7 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
       } else if (box.top < -2 && box.bottom > window.innerHeight * 0.5) start();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (!handoff && phase === "idle" && START_KEYS.has(event.key) && inPlace()) {
+      if (!over && phase === "idle" && START_KEYS.has(event.key) && inPlace()) {
         event.preventDefault();
         start();
       } else if (phase === "playing" && (event.key === "Escape" || event.key === "Tab")) {
@@ -252,11 +266,38 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
     if (reduced) {
       phase = "done";
       apply(END);
+    } else if (scrubbed) {
+      // Opens on the bare ground: the deal is the first thing the scroll moves.
+      const track = trackRef.current;
+      if (!track) return;
+      const follow = () => {
+        frame = 0;
+        const travel = Math.max(track.offsetHeight - viewportHeight(), 1) * SETTLE;
+        const k = Math.min(Math.max(-track.getBoundingClientRect().top / travel, 0), 1);
+        phase = k >= 1 ? "done" : "playing";
+        apply(DEAL_AT + (END - DEAL_AT) * k);
+        if (k >= 1) setPlayed(true);
+      };
+      const onFollow = () => {
+        if (!frame) frame = requestAnimationFrame(follow);
+      };
+      const sizes = new ResizeObserver(() => {
+        measure();
+        follow();
+      });
+      sizes.observe(root);
+      window.addEventListener("scroll", onFollow, { passive: true });
+      follow();
+      return () => {
+        cancelAnimationFrame(frame);
+        sizes.disconnect();
+        window.removeEventListener("scroll", onFollow);
+      };
     } else {
       apply(0);
       if (autoplay) start();
       // Loaded part-way down the page, past the point where it would have played.
-      else if (handoff && root.getBoundingClientRect().top < -2) finish();
+      else if (over && root.getBoundingClientRect().top < -2) finish();
     }
 
     window.addEventListener("wheel", onWheel, { passive: false });
@@ -275,100 +316,108 @@ export function WorkIntro({ projects, backdrop, autoplay = false, handoff = fals
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("keydown", onKey);
     };
-  }, [autoplay, handoff]);
+  }, [autoplay, over, scrubbed]);
 
   const project = projects[focused];
   const href = projectHref(project);
   const external = href.startsWith("http");
 
   return (
-    <section ref={rootRef} id="work" aria-labelledby="work-title" className={`work-intro relative isolate h-svh overflow-clip ${handoff ? "z-10" : "bg-ground"}`}>
-      {handoff && (
-        <div ref={curtainRef} aria-hidden="true" className="work-curtain">
-          <div ref={holeRef} />
-        </div>
-      )}
-      <header
-        ref={headRef}
-        className="absolute inset-x-[var(--gutter)] top-0 flex h-[var(--box-top)] items-end justify-between gap-6 pb-4 opacity-0"
-      >
-        <h2 id="work-title" className="text-[clamp(28px,3.6vw,52px)] font-medium leading-none tracking-[-0.035em]">
-          Selected work
-        </h2>
-        <p className="kicker pb-1 max-sm:hidden">03 / Work</p>
-      </header>
-
-      <div ref={sceneRef} data-backdrop={backdrop} className="work-scene">
-        <div ref={skyRef} aria-hidden="true" className="absolute inset-0 opacity-0">
-          <Image src="/work/sky/sky-day.webp" alt="" fill sizes="100vw" data-on={backdrop === "day"} className="work-layer object-cover" />
-          <Image src="/work/sky/sky-night.webp" alt="" fill sizes="100vw" data-on={backdrop === "night"} className="work-layer object-cover" />
-          <div data-on={backdrop === "stars"} className="work-layer absolute inset-0 bg-[#0e0e10]">
-            <SpaceField fill />
+    <section
+      ref={trackRef}
+      id="work"
+      aria-labelledby="work-title"
+      className={`relative ${over ? "z-10" : "bg-ground"}`}
+      style={scrubbed ? { height: `calc(100svh * ${1 + SCROLL_SCREENS})` } : undefined}
+    >
+      <div ref={rootRef} className="work-intro sticky top-0 isolate h-svh overflow-clip">
+        {over && (
+          <div ref={curtainRef} aria-hidden="true" className="work-curtain">
+            <div ref={holeRef} />
           </div>
-          {/* A dark tint over the backdrop only, behind the cards, so they stand off it. */}
-          <div className="work-haze" />
+        )}
+        <header
+          ref={headRef}
+          className="absolute inset-x-[var(--gutter)] top-0 flex h-[var(--box-top)] items-end justify-between gap-6 pb-4 opacity-0"
+        >
+          <h2 id="work-title" className="text-[clamp(28px,3.6vw,52px)] font-medium leading-none tracking-[-0.035em]">
+            Selected work
+          </h2>
+          <p className="kicker pb-1 max-sm:hidden">03 / Work</p>
+        </header>
+
+        <div ref={sceneRef} data-backdrop={backdrop} className="work-scene">
+          <div ref={skyRef} aria-hidden="true" className="absolute inset-0 opacity-0">
+            <Image src="/work/sky/sky-day.webp" alt="" fill sizes="100vw" data-on={backdrop === "day"} className="work-layer object-cover" />
+            <Image src="/work/sky/sky-night.webp" alt="" fill sizes="100vw" data-on={backdrop === "night"} className="work-layer object-cover" />
+            <div data-on={backdrop === "stars"} className="work-layer absolute inset-0 bg-[#0e0e10]">
+              <SpaceField fill />
+            </div>
+            {/* A dark tint over the backdrop only, behind the cards, so they stand off it. */}
+            <div className="work-haze" />
+          </div>
+
+          <Deck projects={projects} onFocus={onFocus} drive={drive} seat={SEAT} around={36} tight scrollTurns />
+
+          {/* Opaque, so the wheel rises out of the clouds instead of showing through them. */}
+          <div ref={cloudsRef} aria-hidden="true" className="work-clouds opacity-0">
+            <Image src="/work/sky/clouds-day.webp" alt="" width={2172} height={724} sizes="100vw" data-on={backdrop === "day"} className="work-layer" />
+            <Image src="/work/sky/clouds-night.webp" alt="" width={2172} height={724} sizes="100vw" data-on={backdrop === "night"} className="work-layer" />
+          </div>
         </div>
 
-        <Deck projects={projects} onFocus={onFocus} drive={drive} seat={SEAT} around={36} tight scrollTurns />
-
-        {/* Opaque, so the wheel rises out of the clouds instead of showing through them. */}
-        <div ref={cloudsRef} aria-hidden="true" className="work-clouds opacity-0">
-          <Image src="/work/sky/clouds-day.webp" alt="" width={2172} height={724} sizes="100vw" data-on={backdrop === "day"} className="work-layer" />
-          <Image src="/work/sky/clouds-night.webp" alt="" width={2172} height={724} sizes="100vw" data-on={backdrop === "night"} className="work-layer" />
+        <div
+          ref={footRef}
+          className="absolute inset-x-[var(--gutter)] bottom-0 flex h-[var(--box-bottom)] items-start justify-between gap-8 pt-5 opacity-0"
+        >
+          <div className="flex min-w-0 flex-col gap-2">
+            <SwapText
+              id={project.slug}
+              text={`${String(project.order).padStart(2, "0")} / ${project.name} / ${project.kind}`}
+              className="kicker"
+            />
+            <SwapText
+              id={project.slug}
+              text={project.oneLiner}
+              delay={0.05}
+              className="max-w-[34ch] text-[clamp(18px,2.1vw,30px)] font-medium leading-[1.12] tracking-[-0.03em]"
+            />
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-3">
+            <a
+              href={href}
+              target={external ? "_blank" : undefined}
+              rel={external ? "noopener noreferrer" : undefined}
+              tabIndex={settled ? undefined : -1}
+              className="inline-flex h-11 items-center rounded-full border border-line-strong px-5 font-mono text-[12px] uppercase tracking-[0.12em] transition-colors duration-300 hover:border-ink"
+            >
+              <SwapLabel>{project.live ? "Open live" : project.source ? "Source" : "Details"}</SwapLabel>
+              <span aria-hidden="true" className="arrow">
+                ↗
+              </span>
+            </a>
+            <p className="kicker max-sm:hidden">Scroll or drag to turn</p>
+          </div>
         </div>
+        <p aria-live="polite" className="sr-only">
+          {announce}
+        </p>
+
+        <div ref={countRef} aria-hidden="true" className="pointer-events-none absolute right-[var(--gutter)] top-[var(--gutter)] flex flex-col items-end gap-1 opacity-0">
+          <span ref={numberRef} className="font-mono text-[clamp(44px,6vw,88px)] font-medium leading-none tracking-[-0.04em] tabular-nums">
+            000
+          </span>
+          <span className="kicker">Dealing the work</span>
+        </div>
+
+        {/* The reel's last frame, as the pinned video leaves it. */}
+        {!over && !scrubbed && (
+          <div ref={veilRef} aria-hidden="true" className="work-veil">
+            <Image src={reel.poster} alt="" fill sizes="100vw" priority className="object-cover" />
+            <p className="kicker absolute bottom-5 left-6 !text-ink">Keep scrolling ↓</p>
+          </div>
+        )}
       </div>
-
-      <div
-        ref={footRef}
-        className="absolute inset-x-[var(--gutter)] bottom-0 flex h-[var(--box-bottom)] items-start justify-between gap-8 pt-5 opacity-0"
-      >
-        <div className="flex min-w-0 flex-col gap-2">
-          <SwapText
-            id={project.slug}
-            text={`${String(project.order).padStart(2, "0")} / ${project.name} / ${project.kind}`}
-            className="kicker"
-          />
-          <SwapText
-            id={project.slug}
-            text={project.oneLiner}
-            delay={0.05}
-            className="max-w-[34ch] text-[clamp(18px,2.1vw,30px)] font-medium leading-[1.12] tracking-[-0.03em]"
-          />
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-3">
-          <a
-            href={href}
-            target={external ? "_blank" : undefined}
-            rel={external ? "noopener noreferrer" : undefined}
-            tabIndex={settled ? undefined : -1}
-            className="inline-flex h-11 items-center rounded-full border border-line-strong px-5 font-mono text-[12px] uppercase tracking-[0.12em] transition-colors duration-300 hover:border-ink"
-          >
-            <SwapLabel>{project.live ? "Open live" : project.source ? "Source" : "Details"}</SwapLabel>
-            <span aria-hidden="true" className="arrow">
-              ↗
-            </span>
-          </a>
-          <p className="kicker max-sm:hidden">Scroll or drag to turn</p>
-        </div>
-      </div>
-      <p aria-live="polite" className="sr-only">
-        {announce}
-      </p>
-
-      <div ref={countRef} aria-hidden="true" className="pointer-events-none absolute right-[var(--gutter)] top-[var(--gutter)] flex flex-col items-end gap-1 opacity-0">
-        <span ref={numberRef} className="font-mono text-[clamp(44px,6vw,88px)] font-medium leading-none tracking-[-0.04em] tabular-nums">
-          000
-        </span>
-        <span className="kicker">Dealing the work</span>
-      </div>
-
-      {/* The reel's last frame, as the pinned video leaves it. */}
-      {!handoff && (
-        <div ref={veilRef} aria-hidden="true" className="work-veil">
-          <Image src={reel.poster} alt="" fill sizes="100vw" priority className="object-cover" />
-          <p className="kicker absolute bottom-5 left-6 !text-ink">Keep scrolling ↓</p>
-        </div>
-      )}
     </section>
   );
 }
