@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { PageLink } from "@/components/transition/PageLink";
 import { Sparks } from "@/components/about/Sparks";
+import { Build } from "@/components/build/Build";
+import { BuildConductor } from "@/components/build/BuildConductor";
 import { Footer } from "@/components/footer/Footer";
 import { FooterCurtain } from "@/components/footer/FooterCurtain";
-import { FadeUp } from "@/components/motion/FadeUp";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { Decode, Lines, Rise } from "@/components/motion/Text";
 import { SiteMark } from "@/components/nav/SiteMark";
@@ -51,31 +52,34 @@ export default function WorkPage() {
           </Lines>
         </section>
 
-        <WorkGrid projects={featured} />
+        {/* Below the rows heading, agent cursors put the page together as it scrolls in. */}
+        <BuildConductor>
+          <WorkGrid projects={featured} />
 
-        {/* The page does not end on a list: two doors on. */}
-        <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">
-          <FadeUp each="cards" className="grid gap-3 sm:grid-cols-2">
-            <PageLink href="/about" className={door}>
-              <span className="kicker">Next</span>
-              <span className="text-[clamp(40px,6vw,96px)] font-medium leading-none tracking-[-0.04em]">
-                About
-                <span aria-hidden="true" className="arrow">
-                  ↗
+          {/* The page does not end on a list: two doors on. */}
+          <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">
+            <Build each className="grid gap-3 sm:grid-cols-2">
+              <PageLink href="/about" data-box className={door}>
+                <span className="kicker">Next</span>
+                <span className="text-[clamp(40px,6vw,96px)] font-medium leading-none tracking-[-0.04em]">
+                  About
+                  <span aria-hidden="true" className="arrow">
+                    ↗
+                  </span>
                 </span>
-              </span>
-            </PageLink>
-            <a href={`mailto:${site.email}`} className={door}>
-              <span className="kicker">Say hello</span>
-              <span className="mt-auto text-[clamp(22px,2.8vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] [overflow-wrap:anywhere]">
-                {site.email}
-                <span aria-hidden="true" className="arrow">
-                  ↗
+              </PageLink>
+              <a href={`mailto:${site.email}`} data-box className={door}>
+                <span className="kicker">Say hello</span>
+                <span className="mt-auto text-[clamp(22px,2.8vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] [overflow-wrap:anywhere]">
+                  {site.email}
+                  <span aria-hidden="true" className="arrow">
+                    ↗
+                  </span>
                 </span>
-              </span>
-            </a>
-          </FadeUp>
-        </section>
+              </a>
+            </Build>
+          </section>
+        </BuildConductor>
       </main>
       <FooterCurtain />
       <Footer />
