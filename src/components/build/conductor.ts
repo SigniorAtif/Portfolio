@@ -135,6 +135,16 @@ type Cursor = {
 };
 
 const now = () => performance.now() / 1000;
+
+/**
+ * How far past a cursor's hot spot its drawing reaches on each side: the
+ * pointer a little to the left, its name tag well to the right. A cursor
+ * sent off an edge goes this far beyond it, so none of it is still on
+ * screen when it is hidden, and one brought in from an edge starts as far.
+ */
+function offstage(cursor: { role: string }) {
+  return { left: 24, right: 13 + 18 + cursor.role.length * 7 + 12 };
+}
 const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 const easeOut = (p: number) => 1 - (1 - p) ** 3;
 const easeInOut = (p: number) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
@@ -1345,7 +1355,7 @@ export class Conductor {
         if (cursor.pos.y < view.top - 40 || cursor.pos.y > view.bottom + 40) cursor.shown = false;
         else cursor.leaving = {
           from: { ...cursor.pos },
-          to: { x: toRight ? view.right + 32 : view.left - 32, y: cursor.pos.y + (index % 2 ? 40 : -40) },
+          to: { x: toRight ? view.right + offstage(cursor).left : view.left - offstage(cursor).right, y: cursor.pos.y + (index % 2 ? 40 : -40) },
           at: t + (index % 6) * 0.05,
         };
       }
@@ -1390,7 +1400,8 @@ export class Conductor {
       if (!best) return;
       const view = this.view();
       const fromRight = target.x > (view.left + view.right) / 2;
-      best.pos = { x: fromRight ? view.right + 24 : view.left - 24, y: target.y + ((this.cursors.indexOf(best) % 5) - 2) * 36 };
+      best.role = job.role;
+      best.pos = { x: fromRight ? view.right + offstage(best).left : view.left - offstage(best).right, y: target.y + ((this.cursors.indexOf(best) % 5) - 2) * 36 };
       best.shown = true;
     }
     best.leaving = null;
