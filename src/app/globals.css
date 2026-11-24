@@ -1788,6 +1788,9 @@ body {
   border: 1px solid var(--progress);
   background: color-mix(in srgb, var(--progress) 9%, transparent);
 }
+.build-hollow {
+  background: none;
+}
 .build-marquee > i {
   position: absolute;
   left: -4px;
@@ -1807,6 +1810,21 @@ body {
 }
 .build-marquee > i:nth-child(4) {
   transform: translate(var(--w), var(--h));
+}
+/* A frame's outline and hairlines as they are drawn; the frame itself takes over once the block is built. */
+.build-outline {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+}
+.build-rule {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: var(--line);
 }
 .build-size {
   position: absolute;

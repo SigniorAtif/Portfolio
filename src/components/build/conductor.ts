@@ -27,6 +27,10 @@ const T = {
   drag: 0.3, // the marquee, corner to corner
   fill: 0.3, // the box's content fades in
   release: 0.14, // the marquee and its handles go
+  outline: 0.3, // a block's outline, corner to corner
+  hop: 0.1, // a cursor's move from one rule to the next
+  rule: 0.18, // a label's rule, end to end
+  divider: 0.14, // a hairline between two boxes, end to end
   box: 0.09, // between the boxes of one block
   block: 0.15, // between blocks that enter together
   open: 0.1, // after the page opens, for blocks already on screen
@@ -112,28 +116,36 @@ function relative(el: Element, to: DOMRect): Rect {
   return { x: r.left - to.left, y: r.top - to.top, w: r.width, h: r.height };
 }
 
-/** The marquee a box is dragged out with: a ruled rectangle, four handles and a size pill. */
-function marquee(overlay: HTMLElement) {
+/**
+ * The marquee a box is dragged out with: a ruled rectangle, four handles and a
+ * size pill. A "band" is the thin one a rule is dragged out with, and a
+ * "hollow" one draws a frame's outline; neither has a pill, and a hollow one
+ * has no tint, so the boxes under it keep their own.
+ */
+function marquee(overlay: HTMLElement, kind: "box" | "band" | "hollow" = "box") {
   const el = document.createElement("div");
-  el.className = "build-marquee";
+  el.className = kind === "hollow" ? "build-marquee build-hollow" : "build-marquee";
   el.innerHTML = "<i></i><i></i><i></i><i></i>";
-  const size = document.createElement("span");
-  size.className = "build-size";
-  el.append(size);
+  const size = kind === "box" ? document.createElement("span") : null;
+  if (size) {
+    size.className = "build-size";
+    el.append(size);
+  }
   overlay.append(el);
   let said = "";
   return {
-    draw(r: Rect, p: number) {
-      const w = r.w * p;
-      const h = r.h * p;
-      el.style.visibility = p > 0 ? "visible" : "hidden";
+    /** Draws the marquee grown to `pw` of the rectangle's width and `ph` of its height. */
+    draw(r: Rect, pw: number, ph = pw) {
+      const w = r.w * pw;
+      const h = r.h * ph;
+      el.style.visibility = pw > 0 && ph > 0 ? "visible" : "hidden";
       el.style.transform = `translate(${r.x}px, ${r.y}px)`;
       el.style.width = `${w}px`;
       el.style.height = `${h}px`;
       el.style.setProperty("--w", `${w}px`);
       el.style.setProperty("--h", `${h}px`);
       const says = `${Math.round(w)} × ${Math.round(h)}`;
-      if (says !== said) size.textContent = said = says;
+      if (size && says !== said) size.textContent = said = says;
     },
     fade(alpha: number) {
       el.style.opacity = alpha >= 1 ? "" : String(alpha);
@@ -141,23 +153,81 @@ function marquee(overlay: HTMLElement) {
   };
 }
 
-/** The frame of a block: the outline and the hairlines between its boxes. */
+/** A hairline between two boxes, in block coordinates. */
+type Segment = { x: number; y: number; length: number; thickness: number; vertical: boolean };
+
+/**
+ * The hairlines of a frame: the gaps its colour shows through between the
+ * boxes. Gaps on one line are joined, so a rule that crosses the frame is
+ * drawn in one stroke, the way it reads.
+ */
+function dividers(rects: Rect[]): Segment[] {
+  const found: Segment[] = [];
+  for (const a of rects) {
+    for (const b of rects) {
+      const gapX = b.x - (a.x + a.w);
+      const top = Math.max(a.y, b.y);
+      const bottom = Math.min(a.y + a.h, b.y + b.h);
+      if (gapX > 0.25 && gapX < 3 && bottom - top > 4) found.push({ x: a.x + a.w, y: top, length: bottom - top, thickness: gapX, vertical: true });
+      const gapY = b.y - (a.y + a.h);
+      const left = Math.max(a.x, b.x);
+      const right = Math.min(a.x + a.w, b.x + b.w);
+      if (gapY > 0.25 && gapY < 3 && right - left > 4) found.push({ x: left, y: a.y + a.h, length: right - left, thickness: gapY, vertical: false });
+    }
+  }
+  const joined: Segment[] = [];
+  for (const segment of found.sort((m, n) => Number(m.vertical) - Number(n.vertical) || (m.vertical ? m.x - n.x || m.y - n.y : m.y - n.y || m.x - n.x))) {
+    const last = joined[joined.length - 1];
+    const lead = (s: Segment) => (s.vertical ? s.y : s.x);
+    const side = (s: Segment) => (s.vertical ? s.x : s.y);
+    if (last && last.vertical === segment.vertical && Math.abs(side(last) - side(segment)) < 0.5 && lead(segment) <= lead(last) + last.length + 3) {
+      last.length = Math.max(last.length, lead(segment) + segment.length - lead(last));
+      continue;
+    }
+    joined.push({ ...segment });
+  }
+  return joined;
+}
+
+/** Draws a hairline in the frame's colour, grown to `p` of its length. */
+function hairline(overlay: HTMLElement, s: Segment) {
+  const el = document.createElement("div");
+  el.className = "build-rule";
+  // Placed by left and top, not a transform, so it snaps to the pixel the frame's own gap does.
+  el.style.left = `${s.x}px`;
+  el.style.top = `${s.y}px`;
+  overlay.append(el);
+  return (p: number) => {
+    el.style.width = `${s.vertical ? s.thickness : s.length * p}px`;
+    el.style.height = `${s.vertical ? s.length * p : s.thickness}px`;
+  };
+}
+
+/** The band a rule is dragged out with: five pixels across, centred on the rule. */
+function band(s: Segment): Rect {
+  return s.vertical
+    ? { x: s.x + s.thickness / 2 - 2.5, y: s.y, w: 5, h: s.length }
+    : { x: s.x, y: s.y + s.thickness / 2 - 2.5, w: s.length, h: 5 };
+}
+
+/** Where the crosshair is while a rule is `p` of the way out. */
+function along(s: Segment, p: number): Point {
+  return s.vertical ? { x: s.x + s.thickness / 2, y: s.y + s.length * p } : { x: s.x + s.length * p, y: s.y + s.thickness / 2 };
+}
+
+const lerp = (a: Point, b: Point, p: number): Point => ({ x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p });
+
+/** The frame of a block: the outline and the hairlines between its boxes, hidden until it is built. */
 function hideFrame(frame: HTMLElement) {
   frame.style.transition = "none";
   frame.style.borderColor = "transparent";
   frame.style.backgroundColor = "transparent";
 }
 
-function showFrame(frame: HTMLElement, p: number) {
-  if (p >= 1) {
-    frame.style.removeProperty("border-color");
-    frame.style.removeProperty("background-color");
-    frame.style.removeProperty("transition");
-    return;
-  }
-  const mix = `color-mix(in srgb, var(--line) ${Math.round(p * 100)}%, transparent)`;
-  frame.style.borderColor = mix;
-  frame.style.backgroundColor = mix;
+function restoreFrame(frame: HTMLElement) {
+  frame.style.removeProperty("border-color");
+  frame.style.removeProperty("background-color");
+  frame.style.removeProperty("transition");
 }
 
 function boxesOf(el: HTMLElement): HTMLElement[] {
@@ -284,7 +354,7 @@ export class Conductor {
     if (block.mode === "build" && modeNow() !== "build") {
       for (const box of boxesOf(block.el)) box.style.removeProperty("opacity");
       const frame = frameOf(block.el);
-      if (frame) showFrame(frame, 1);
+      if (frame) restoreFrame(frame);
       block.mode = "fade";
       gsap.set(this.fadeTargets(block), { opacity: 0 });
     }
@@ -323,14 +393,17 @@ export class Conductor {
     block.el.append(overlay);
     block.overlay = overlay;
 
-    const jobs: Job[] = boxesOf(block.el).map((el, index) => {
-      const r = relative(el, box);
+    const boxes = boxesOf(block.el);
+    const rects = boxes.map((el) => relative(el, box));
+
+    const jobs: Job[] = boxes.map((el, index) => {
+      const r = rects[index];
       const start = at + index * T.box;
       const drawn = marquee(overlay);
       const dragged = start + T.arrive;
       const filled = dragged + T.drag;
-      const released = filled + T.fill;
-      return this.job(block, start, { x: r.x, y: r.y }, [
+      const corner = { x: r.x + r.w, y: r.y + r.h };
+      const steps: Step[] = [
         {
           at: dragged,
           dur: T.drag,
@@ -345,16 +418,103 @@ export class Conductor {
             el.style.opacity = p >= 1 ? "" : String(p);
           },
         },
-        { at: released, dur: T.release, apply: (p) => drawn.fade(1 - p) },
-      ]);
+      ];
+      // The rule under the box's label: the crosshair hops to its start and drags it out.
+      let cursorAt = filled;
+      let from = corner;
+      for (const rule of el.querySelectorAll<HTMLElement>("[data-rule]")) {
+        const rr = relative(rule, box);
+        const segment: Segment = { x: rr.x, y: rr.y, length: rr.w, thickness: rr.h, vertical: false };
+        const start = along(segment, 0);
+        const hop = from;
+        const drawnRule = marquee(overlay, "band");
+        steps.push(
+          { at: cursorAt, dur: T.hop, shape: "cross", apply: () => {}, point: (p) => lerp(hop, start, easeInOut(p)) },
+          {
+            at: cursorAt + T.hop,
+            dur: T.rule,
+            shape: "cross",
+            apply: (p) => {
+              const e = easeOut(p);
+              rule.style.transformOrigin = p >= 1 ? "" : "left";
+              rule.style.transform = p >= 1 ? "" : `scaleX(${e})`;
+              drawnRule.draw(band(segment), e, 1);
+            },
+            point: (p) => along(segment, easeOut(p)),
+          },
+          { at: cursorAt + T.hop + T.rule, dur: T.release, apply: (p) => drawnRule.fade(1 - p) },
+        );
+        cursorAt += T.hop + T.rule;
+        from = along(segment, 1);
+      }
+      const released = Math.max(filled + T.fill, cursorAt);
+      steps.push({ at: released, dur: T.release, apply: (p) => drawn.fade(1 - p) });
+      return this.job(block, start, { x: r.x, y: r.y }, steps);
     });
 
-    // The hairlines are the frame's own colour showing between the boxes, so the frame
-    // comes in once every box is filled; any earlier and the empty boxes show it whole.
+    // The frame's outline and hairlines are drawn over it by two more agents, and the
+    // frame itself takes over once the block is finished, in the same places.
     const frame = frameOf(block.el);
     if (frame) {
-      const filled = Math.max(...jobs.map((job) => job.end)) - T.release;
-      jobs.push(this.job(block, filled, null, [{ at: filled, dur: T.release, apply: (p) => showFrame(frame, p) }]));
+      const f = relative(frame, box);
+      const outline = document.createElement("div");
+      outline.className = "build-outline";
+      outline.style.borderRadius = getComputedStyle(frame).borderTopLeftRadius;
+      outline.style.left = `${f.x}px`;
+      outline.style.top = `${f.y}px`;
+      overlay.append(outline);
+      const drawnOutline = marquee(overlay, "hollow");
+      const drawing = at + T.arrive;
+      jobs.push(
+        this.job(block, at, { x: f.x, y: f.y }, [
+          {
+            at: drawing,
+            dur: T.outline,
+            shape: "cross",
+            apply: (p) => {
+              const e = easeOut(p);
+              outline.style.width = `${f.w * e}px`;
+              outline.style.height = `${f.h * e}px`;
+              outline.style.visibility = p > 0 ? "visible" : "hidden";
+              drawnOutline.draw(f, e);
+            },
+            point: (p) => ({ x: f.x + f.w * easeOut(p), y: f.y + f.h * easeOut(p) }),
+          },
+          { at: drawing + T.outline, dur: T.release, apply: (p) => drawnOutline.fade(1 - p) },
+        ]),
+      );
+
+      const segments = dividers(rects);
+      if (segments.length) {
+        const steps: Step[] = [];
+        let cursorAt = at + T.arrive;
+        segments.forEach((segment, index) => {
+          const grow = hairline(overlay, segment);
+          const drawnRule = marquee(overlay, "band");
+          if (index > 0) {
+            const hop = along(segments[index - 1], 1);
+            const start = along(segment, 0);
+            steps.push({ at: cursorAt, dur: T.hop, shape: "cross", apply: () => {}, point: (p) => lerp(hop, start, easeInOut(p)) });
+            cursorAt += T.hop;
+          }
+          steps.push(
+            {
+              at: cursorAt,
+              dur: T.divider,
+              shape: "cross",
+              apply: (p) => {
+                const e = easeOut(p);
+                grow(e);
+                drawnRule.draw(band(segment), segment.vertical ? 1 : e, segment.vertical ? e : 1);
+              },
+              point: (p) => along(segment, easeOut(p)),
+            },
+            { at: cursorAt + T.divider, dur: T.release, apply: (p) => drawnRule.fade(1 - p) },
+          );
+          cursorAt += T.divider;
+        });
+        jobs.push(this.job(block, at, along(segments[0], 0), steps));
+      }
     }
 
     block.jobs = jobs;
@@ -389,7 +549,7 @@ export class Conductor {
     } else if (block.mode === "build") {
       for (const box of boxesOf(block.el)) box.style.removeProperty("opacity");
       const frame = frameOf(block.el);
-      if (frame) showFrame(frame, 1);
+      if (frame) restoreFrame(frame);
       for (const job of block.jobs) {
         job.steps.forEach((step, index) => {
           if (job.last[index] !== 1) step.apply(1);
@@ -402,7 +562,9 @@ export class Conductor {
     block.overlay = null;
     block.jobs = [];
     block.state = "done";
-    for (const el of [...boxesOf(block.el), frameOf(block.el)]) if (el && !el.getAttribute("style")) el.removeAttribute("style");
+    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule]"), frameOf(block.el)]) {
+      if (el && !el.getAttribute("style")) el.removeAttribute("style");
+    }
     this.entering?.unobserve(block.el);
   }
 

@@ -81,7 +81,7 @@ function Label({ children }: { children: ReactNode }) {
   return (
     <p className="kicker flex items-center gap-3">
       {children}
-      <span aria-hidden="true" className="h-px grow bg-line" />
+      <span aria-hidden="true" data-rule className="h-px grow bg-line" />
     </p>
   );
 }
