@@ -16,6 +16,14 @@ export type Mode = "build" | "fade" | "still";
 /** Where the cursors run: a mouse, room for a whole row, and motion allowed. */
 const BUILD_QUERY = "(hover: hover) and (pointer: fine) and (min-width: 900px)";
 
+/**
+ * A cursor build starts when its block's top crosses this share of the
+ * screen, a little above the house reveal line, so the cursors start once the
+ * visitor is scrolling. A block already on screen when the page opens is part
+ * of the page they land on and is simply there, never built in front of them.
+ */
+const BUILD_LINE = 0.7;
+
 function modeNow(): Mode {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "still";
   return window.matchMedia(BUILD_QUERY).matches ? "build" : "fade";
@@ -357,7 +365,9 @@ export class Conductor {
   private cursors: Cursor[] = [];
   private layer: HTMLElement | null = null;
   private opened = false;
+  /** Fade-ups wait for the house reveal line; cursor builds for the build line. */
   private entering: IntersectionObserver | null = null;
+  private building: IntersectionObserver | null = null;
   private seen: IntersectionObserver | null = null;
   private ticking = false;
   private quietSince = -1;
@@ -430,23 +440,24 @@ export class Conductor {
   open() {
     if (this.opened) return;
     this.opened = true;
-    this.entering = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const block = this.blocks.get(entry.target as HTMLElement);
-          if (block?.state === "pending") this.start(block, now());
-        }
-      },
-      // A block enters when its top crosses the house reveal line.
-      { rootMargin: `0px 0px -${Math.round((1 - IN_VIEW) * 100)}% 0px` },
-    );
+    const enter = (entries: IntersectionObserverEntry[]) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const block = this.blocks.get(entry.target as HTMLElement);
+        if (block?.state === "pending") this.start(block, now());
+      }
+    };
+    const line = (share: number) => ({ rootMargin: `0px 0px -${Math.round((1 - share) * 100)}% 0px` });
+    this.entering = new IntersectionObserver(enter, line(IN_VIEW));
+    this.building = new IntersectionObserver(enter, line(BUILD_LINE));
     this.watch([...this.blocks.values()]);
   }
 
   destroy() {
     for (const block of [...this.blocks.values()]) this.unregister(block.el);
     this.entering?.disconnect();
+    this.building?.disconnect();
+    this.building = null;
     this.seen?.disconnect();
     this.seen = null;
     this.entering = null;
@@ -458,14 +469,24 @@ export class Conductor {
     window.removeEventListener("resize", this.onResize);
   }
 
-  /** Blocks on screen when the page opens start with it, top to bottom; the rest wait to enter. */
+  /**
+   * Fade-ups on screen when the page opens start with it, top to bottom; the
+   * rest wait to enter. A cursor build on screen then is shown finished, and
+   * the rest wait for the build line.
+   */
   private watch(blocks: Block[]) {
     let order = 0;
     const at = now();
     for (const block of blocks) {
       if (block.state !== "pending") continue;
       const r = block.el.getBoundingClientRect();
-      if (r.top < window.innerHeight && r.bottom > 0) this.start(block, at + T.open + order++ * T.block);
+      const shown = r.top < window.innerHeight && r.bottom > 0;
+      if (block.mode === "build") {
+        if (shown) this.finish(block);
+        else this.building?.observe(block.el);
+        continue;
+      }
+      if (shown) this.start(block, at + T.open + order++ * T.block);
       else this.entering?.observe(block.el);
     }
   }
@@ -476,6 +497,7 @@ export class Conductor {
 
   private start(block: Block, at: number) {
     this.entering?.unobserve(block.el);
+    this.building?.unobserve(block.el);
     block.state = "running";
     // The window may have lost its mouse or its width since the block was hidden.
     if (block.mode === "build" && modeNow() !== "build") {
@@ -762,6 +784,7 @@ export class Conductor {
       if (el && !el.getAttribute("style")) el.removeAttribute("style");
     }
     this.entering?.unobserve(block.el);
+    this.building?.unobserve(block.el);
   }
 
   private release(cursor: Cursor) {
