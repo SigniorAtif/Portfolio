@@ -31,24 +31,30 @@ function modeNow(): Mode {
 
 /** Seconds. */
 const T = {
-  arrive: 0.24, // a cursor's flight to its box's corner
-  drag: 0.26, // the marquee, corner to corner
-  fill: 0.2, // the box itself fades in; its text is typed after
-  release: 0.12, // the marquee and its handles go
-  outline: 0.3, // a block's outline, corner to corner
-  hop: 0.05, // a cursor's move to its next piece of work
-  rule: 0.14, // a label's rule, end to end
-  divider: 0.14, // a hairline between two boxes, end to end
-  pick: 0.16, // a name held in its selection box
-  show: 0.1, // links fade in
-  typing: 110, // characters a second, before a long box is sped up to fit
-  most: 1.2, // the longest a box may take, from its marquee starting out to its marquee gone
-  box: 0.09, // between the boxes of one block
-  block: 0.15, // between blocks that enter together
+  arrive: 0.5, // a cursor's flight to its first point
+  think: 0.22, // a pause on the first point before the agent sets to work
+  drag: 0.55, // the marquee, corner to corner
+  fill: 0.32, // the box fades in, its placeholder lines with it; its text is typed after
+  release: 0.22, // a marquee and its handles go
+  plan: 0.6, // a framed block's boxes wait this long, so its outline and guides go down first
+  outline: 1.15, // the pen's trip round a frame's outline
+  guide: 0.26, // a column guide dropped down the frame
+  hop: 0.14, // a cursor's move to its next piece of work
+  rule: 0.3, // a label's rule, end to end
+  divider: 0.32, // a hairline between two boxes, end to end
+  pick: 0.36, // a name held in its selection box
+  show: 0.26, // links fade in
+  ripple: 0.42, // the ring a click leaves
+  upload: 1.05, // a capture's upload bar, empty to full
+  wipe: 0.5, // the capture drawn in, top to bottom
+  typing: 46, // characters a second at an even pace, before a long box is sped up to fit
+  most: 3.8, // the longest a box may take, from its marquee starting out to its marquee gone
+  box: 0.22, // between the boxes of one block
+  block: 0.3, // between blocks that enter together
   open: 0.1, // after the page opens, for blocks already on screen
-  linger: 1, // idle cursors wait this long before they leave
-  leave: 0.55, // a cursor's flight off the edge
-  late: 0.18, // the shortest flight, for a cursor sent to work already under way
+  linger: 1.2, // idle cursors wait this long before they leave
+  leave: 0.7, // a cursor's flight off the edge
+  late: 0.3, // the shortest flight, for a cursor sent to work already under way
 } as const;
 
 type Point = { x: number; y: number };
@@ -63,11 +69,17 @@ type Step = {
   /** Where the cursor is during the step, in block coordinates. Steps without one need no cursor. */
   point?: (p: number) => Point;
   shape?: Shape;
+  /** The button is held down for the step, as it is through a drag. */
+  press?: boolean;
+  /** The agent is deciding: its tag shows it is thinking. */
+  think?: boolean;
 };
 
 /** One agent's work: a cursor flies to `first`, then runs the steps that have a point. */
 type Job = {
   block: Block;
+  /** What the agent is working on, shown on its cursor's tag. */
+  role: string;
   start: number;
   steps: Step[];
   last: number[];
@@ -104,6 +116,12 @@ type Block = {
 
 type Cursor = {
   el: HTMLElement;
+  tag: HTMLElement;
+  role: string;
+  press: boolean;
+  think: boolean;
+  /** When it last finished a job. */
+  idleSince: number;
   colour: string;
   pos: Point;
   shape: Shape;
@@ -166,6 +184,10 @@ function marquee(overlay: HTMLElement, kind: "box" | "band" | "hollow" = "box") 
     },
     fade(alpha: number) {
       el.style.opacity = alpha >= 1 ? "" : String(alpha);
+    },
+    /** Once its box is in, a marquee keeps only its outline and handles, as a selection does. */
+    settle(settled: boolean) {
+      el.classList.toggle("is-settled", settled);
     },
   };
 }
@@ -234,17 +256,23 @@ function along(s: Segment, p: number): Point {
 
 const lerp = (a: Point, b: Point, p: number): Point => ({ x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p });
 
+/** How long a move between two points takes: a hop for a short one, longer for a trip across the block. */
+const hopFor = (a: Point, b: Point) => Math.min(0.45, Math.max(T.hop, Math.hypot(b.x - a.x, b.y - a.y) / 1600));
+
 /** One line of laid-out text, relative to its element, with roughly how many characters it holds. */
 type Line = { left: number; right: number; top: number; bottom: number; chars: number };
 
+/** One run of text on one line: a text node's part of a line box, and the line it sits on. */
+type Piece = Line & { line: number };
+
 /**
- * The lines an element's text is laid out in, top to bottom. Each text node's
- * characters are shared among its line boxes by width, which is close enough
- * for a caret that steps a character at a time.
+ * How an element's text is laid out: its runs, and the lines they make, top
+ * to bottom. Each text node's characters are shared among its line boxes by
+ * width, which is close enough for a caret that steps a character at a time.
  */
-function linesOf(el: HTMLElement): Line[] {
+function layoutOf(el: HTMLElement): { lines: Line[]; pieces: Piece[] } {
   const base = el.getBoundingClientRect();
-  const pieces: Line[] = [];
+  const pieces: Piece[] = [];
   const range = document.createRange();
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
@@ -261,6 +289,7 @@ function linesOf(el: HTMLElement): Line[] {
         top: r.top - base.top,
         bottom: r.bottom - base.top,
         chars: Math.max(1, Math.round((count * r.width) / width)),
+        line: 0,
       });
     }
   }
@@ -275,9 +304,222 @@ function linesOf(el: HTMLElement): Line[] {
       line.top = Math.min(line.top, piece.top);
       line.bottom = Math.max(line.bottom, piece.bottom);
       line.chars += piece.chars;
-    } else lines.push({ ...piece });
+    } else lines.push({ left: piece.left, right: piece.right, top: piece.top, bottom: piece.bottom, chars: piece.chars });
+    piece.line = lines.length - 1;
   }
-  return lines;
+  return { lines, pieces };
+}
+
+/** A fixed scatter in [0, 1), so every visit types a text with the same hand. */
+function noise(n: number) {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/**
+ * When each of a text's characters goes down, as a share of its typing: keys
+ * come unevenly, a space takes a beat, and a comma or a full stop a breath.
+ * `weight` is how many characters' worth of time that takes at an even pace.
+ */
+function rhythm(el: HTMLElement, total: number): { keys: number[]; weight: number } {
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+  const keys: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < total; i++) {
+    const before = text[i - 1] ?? "";
+    let key = 0.6 + 0.8 * noise(i + total * 7);
+    if (text[i] === " ") key += 0.8;
+    if (/[,;:]/.test(before)) key += 2.4;
+    else if (/[.!?]/.test(before)) key += 3.6;
+    sum += key;
+    keys.push(sum);
+  }
+  return { keys: keys.map((key) => key / sum), weight: sum };
+}
+
+/**
+ * Grey placeholder bars where text is about to go, shimmering from the moment
+ * its box fills until the text arrives. Typing eats them as the caret passes.
+ */
+function placeholders(overlay: HTMLElement, at: Rect, pieces: Piece[]) {
+  const bars = pieces.map((piece) => {
+    const el = document.createElement("div");
+    el.className = "build-skel";
+    const height = piece.bottom - piece.top;
+    const bar = Math.max(5, Math.min(18, Math.round(height * 0.5)));
+    el.style.left = `${at.x + piece.left}px`;
+    el.style.top = `${at.y + piece.top + (height - bar) / 2}px`;
+    el.style.width = `${piece.right - piece.left}px`;
+    el.style.height = `${bar}px`;
+    overlay.append(el);
+    return { el, piece, cut: -1 };
+  });
+  return {
+    fade(alpha: number) {
+      for (const bar of bars) bar.el.style.opacity = String(alpha);
+    },
+    /** Takes away every bar on a line above `index`, and on that line whatever lies left of `x`. */
+    eat(index: number, x = 0) {
+      for (const bar of bars) {
+        const { piece } = bar;
+        const width = piece.right - piece.left;
+        const cut = piece.line < index ? width : piece.line > index ? 0 : Math.min(width, Math.max(0, x - piece.left));
+        if (cut === bar.cut) continue;
+        bar.cut = cut;
+        bar.el.style.visibility = cut >= width ? "hidden" : "";
+        bar.el.style.clipPath = cut > 0 && cut < width ? `inset(0 0 0 ${cut}px)` : "";
+      }
+    },
+  };
+}
+
+/** The ring a click leaves, in the clicking agent's colour. */
+function ripple(overlay: HTMLElement, at: Point) {
+  const el = document.createElement("div");
+  el.className = "build-ripple";
+  overlay.append(el);
+  return (p: number, job: Job) => {
+    const shown = p > 0 && p < 1;
+    el.style.visibility = shown ? "visible" : "hidden";
+    if (!shown) return;
+    el.style.transform = `translate(${at.x}px, ${at.y}px) scale(${(0.3 + easeOut(p) * 0.9).toFixed(3)})`;
+    el.style.opacity = (1 - p).toFixed(3);
+    el.style.borderColor = job.cursor?.colour ?? "";
+  };
+}
+
+/** A dashed guide dropped the whole length of a frame, where a hairline will go. */
+function columnGuide(overlay: HTMLElement, s: Segment, f: Rect) {
+  const el = document.createElement("div");
+  el.className = `build-guide ${s.vertical ? "is-down" : "is-across"}`;
+  const from = s.vertical ? { x: s.x + s.thickness / 2, y: f.y } : { x: f.x, y: s.y + s.thickness / 2 };
+  const to = s.vertical ? { x: from.x, y: f.y + f.h } : { x: f.x + f.w, y: from.y };
+  el.style.left = `${from.x}px`;
+  el.style.top = `${from.y}px`;
+  if (s.vertical) el.style.height = `${f.h}px`;
+  else el.style.width = `${f.w}px`;
+  overlay.append(el);
+  return {
+    from,
+    to,
+    drop(p: number) {
+      el.style.visibility = p > 0 ? "visible" : "hidden";
+      const rest = `${((1 - p) * 100).toFixed(2)}%`;
+      el.style.clipPath = p >= 1 ? "" : s.vertical ? `inset(0 0 ${rest} 0)` : `inset(0 ${rest} 0 0)`;
+    },
+    fade(alpha: number) {
+      el.style.opacity = alpha >= 1 ? "" : String(alpha);
+    },
+  };
+}
+
+/** Guides from a dragged corner across the whole block, the way a design tool shows what lines up. */
+function smartGuides(overlay: HTMLElement, w: number, h: number) {
+  const across = document.createElement("div");
+  across.className = "build-smart is-across";
+  across.style.width = `${w}px`;
+  const down = document.createElement("div");
+  down.className = "build-smart is-down";
+  down.style.height = `${h}px`;
+  overlay.append(across, down);
+  return {
+    draw(corner: Point | null) {
+      across.style.visibility = down.style.visibility = corner ? "visible" : "hidden";
+      if (!corner) return;
+      // Moved by transform, so a guide following the corner is not a layout shift.
+      across.style.transform = `translateY(${corner.y.toFixed(1)}px)`;
+      down.style.transform = `translateX(${corner.x.toFixed(1)}px)`;
+    },
+    fade(alpha: number) {
+      across.style.opacity = down.style.opacity = alpha >= 1 ? "" : String(alpha);
+    },
+  };
+}
+
+/**
+ * A frame's outline drawn by a pen going once round it, clockwise from the top
+ * left, as an SVG stroke over the frame's own border line.
+ */
+function trace(overlay: HTMLElement, f: Rect, radius: number) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", "build-trace");
+  svg.setAttribute("width", String(f.w));
+  svg.setAttribute("height", String(f.h));
+  svg.style.left = `${f.x}px`;
+  svg.style.top = `${f.y}px`;
+  const w = f.w - 1;
+  const h = f.h - 1;
+  const r = Math.max(0, Math.min(radius - 0.5, w / 2, h / 2));
+  const rect = document.createElementNS(ns, "rect");
+  rect.setAttribute("x", "0.5");
+  rect.setAttribute("y", "0.5");
+  rect.setAttribute("width", String(w));
+  rect.setAttribute("height", String(h));
+  rect.setAttribute("rx", String(r));
+  svg.append(rect);
+  overlay.append(svg);
+  const across = Math.max(0, w - 2 * r);
+  const down = Math.max(0, h - 2 * r);
+  const bend = (Math.PI * r) / 2;
+  const length = 2 * across + 2 * down + 4 * bend;
+  const round = (cx: number, cy: number, from: number) => (d: number) => ({ x: cx + r * Math.cos(from + d / r), y: cy + r * Math.sin(from + d / r) });
+  // An SVG rect's path starts at the end of its top left corner and runs clockwise; so does the pen.
+  const legs: [number, (d: number) => Point][] = [
+    [across, (d) => ({ x: r + d, y: 0 })],
+    [bend, round(w - r, r, -Math.PI / 2)],
+    [down, (d) => ({ x: w, y: r + d })],
+    [bend, round(w - r, h - r, 0)],
+    [across, (d) => ({ x: w - r - d, y: h })],
+    [bend, round(r, h - r, Math.PI / 2)],
+    [down, (d) => ({ x: 0, y: h - r - d })],
+    [bend, round(r, r, Math.PI)],
+  ];
+  return {
+    length,
+    /** Where the pen is `d` pixels round, in block coordinates. */
+    point(d: number): Point {
+      let left = Math.max(0, Math.min(length, d));
+      for (const [leg, at] of legs) {
+        if (leg > 0 && left <= leg) {
+          const p = at(left);
+          return { x: f.x + 0.5 + p.x, y: f.y + 0.5 + p.y };
+        }
+        left -= leg;
+      }
+      return { x: f.x + 0.5 + r, y: f.y + 0.5 };
+    },
+    draw(d: number) {
+      svg.style.visibility = d > 0 ? "visible" : "hidden";
+      rect.style.strokeDasharray = `${d.toFixed(1)} ${length + 2}`;
+    },
+    fade(alpha: number) {
+      svg.style.opacity = alpha >= 1 ? "" : String(alpha);
+    },
+  };
+}
+
+/** A capture's upload over its empty phone: a percentage and a bar that fills. */
+function uploadBar(overlay: HTMLElement, phone: Rect) {
+  const el = document.createElement("div");
+  el.className = "build-upload";
+  el.style.left = `${phone.x + phone.w / 2}px`;
+  el.style.top = `${phone.y + phone.h / 2}px`;
+  const label = document.createElement("span");
+  const track = document.createElement("b");
+  const fill = document.createElement("i");
+  track.append(fill);
+  el.append(label, track);
+  overlay.append(el);
+  let said = "";
+  return (p: number) => {
+    el.style.visibility = p > 0 && p < 1 ? "visible" : "hidden";
+    // Uploads stall and catch up: the bar runs in three bursts.
+    const done = clamp01(p + 0.06 * Math.sin(p * Math.PI * 3));
+    fill.style.transform = `scaleX(${done.toFixed(3)})`;
+    const says = `uploading ${Math.round(done * 100)}%`;
+    if (says !== said) label.textContent = said = says;
+  };
 }
 
 /** How far outside its box a typed element's glyphs may reach and still show. */
@@ -287,32 +529,49 @@ const SPILL = 48;
  * Types an element's text in place. The text is laid out from the start and
  * a clip shows it: every line above the caret, the current line up to it,
  * nothing below. The line being typed carries a selection, the caret takes
- * the cursor's colour, and at the end the clip, selection and caret go.
+ * the cursor's colour, and at the end the clip, selection and caret go. Until
+ * the caret reaches it, the text's place is held by shimmering bars.
  */
-function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, lines: Line[]) {
+function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, { lines, pieces }: { lines: Line[]; pieces: Piece[] }) {
   const mark = document.createElement("div");
   mark.className = "build-mark";
   const caret = document.createElement("div");
   caret.className = "build-caret";
   overlay.append(mark, caret);
   const total = lines.reduce((sum, line) => sum + line.chars, 0);
+  const { keys, weight } = rhythm(el, total);
+  const held = placeholders(overlay, at, pieces);
+
+  /** How many characters are down at progress `p`. */
+  const typedAt = (p: number) => {
+    let low = 0;
+    let high = keys.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (keys[mid] <= p) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  };
 
   /** Line index and caret x for progress `p`. */
   const place = (p: number) => {
-    let typed = p * total;
+    let typed = typedAt(p);
     let index = 0;
     while (index < lines.length - 1 && typed >= lines[index].chars) typed -= lines[index++].chars;
     const line = lines[index];
-    const done = Math.min(line.chars, Math.floor(typed));
+    const done = Math.min(line.chars, typed);
     return { index, line, x: line.left + ((line.right - line.left) * done) / line.chars };
   };
 
   return {
-    chars: total,
+    weight,
+    held,
     apply(p: number, job: Job) {
       if (p >= 1 || !lines.length) {
         el.style.removeProperty("clip-path");
         mark.style.visibility = caret.style.visibility = "hidden";
+        held.eat(Infinity);
         return;
       }
       const { index, line, x } = place(p);
@@ -320,6 +579,7 @@ function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, lines: Line[]) {
       const bottom = index < lines.length - 1 ? (line.bottom + lines[index + 1].top) / 2 : at.h + SPILL;
       const right = at.w + SPILL;
       el.style.clipPath = `polygon(${-SPILL}px ${-SPILL}px, ${right}px ${-SPILL}px, ${right}px ${top}px, ${x}px ${top}px, ${x}px ${bottom}px, ${-SPILL}px ${bottom}px)`;
+      held.eat(p > 0 ? index : -1, x);
       const shown = p > 0 ? "visible" : "hidden";
       mark.style.visibility = caret.style.visibility = shown;
       // Moved by transform: a caret walking along a line is not a layout shift.
@@ -370,7 +630,6 @@ export class Conductor {
   private building: IntersectionObserver | null = null;
   private seen: IntersectionObserver | null = null;
   private ticking = false;
-  private quietSince = -1;
   private readonly tick = () => this.frame();
   private readonly onResize = () => {
     for (const block of this.blocks.values()) if (block.state === "running") this.finish(block);
@@ -380,9 +639,24 @@ export class Conductor {
   attach(layer: HTMLElement) {
     this.layer = layer;
     this.cursors = Array.from({ length: CURSOR_COUNT }, (_, index) => {
-      const el = makeCursor(index);
+      const { el, tag } = makeCursor(index);
       layer.append(el);
-      return { el, colour: CURSOR_COLOURS[index % CURSOR_COLOURS.length], pos: { x: 0, y: 0 }, shape: "arrow" as Shape, shown: false, job: null, flight: null, leaving: null, drawn: "" };
+      return {
+        el,
+        tag,
+        role: "",
+        press: false,
+        think: false,
+        idleSince: 0,
+        colour: CURSOR_COLOURS[index % CURSOR_COLOURS.length],
+        pos: { x: 0, y: 0 },
+        shape: "arrow" as Shape,
+        shown: false,
+        job: null,
+        flight: null,
+        leaving: null,
+        drawn: "",
+      };
     });
     window.addEventListener("resize", this.onResize);
     this.seen = new IntersectionObserver((entries) => {
@@ -531,7 +805,12 @@ export class Conductor {
     this.run();
   }
 
-  /** Lays out the block's timeline: one job per box, plus the frame. */
+  /**
+   * Lays out the block's timeline. A framed block is planned first: one agent
+   * pens its outline while another drops a dashed guide wherever a hairline
+   * will go. Then an agent a box drags each box out and fills it in, and once
+   * the boxes are in, the hairlines are ruled over the guides.
+   */
   private plan(block: Block, at: number) {
     const layer = this.layer!.getBoundingClientRect();
     const box = block.el.getBoundingClientRect();
@@ -544,59 +823,92 @@ export class Conductor {
 
     const boxes = boxesOf(block.el);
     const rects = boxes.map((el) => relative(el, box));
-
-    const jobs: Job[] = boxes.map((el, index) => this.boxJob(block, overlay, box, el, rects[index], at + index * T.box));
-
-    // The frame's outline and hairlines are drawn over it by two more agents, and the
-    // frame itself takes over once the block is finished, in the same places.
     const frame = frameOf(block.el);
+    const boxesAt = frame ? at + T.plan : at;
+    const jobs: Job[] = boxes.map((el, index) => this.boxJob(block, overlay, box, el, rects[index], boxesAt + index * T.box));
+    // When the last box has filled in.
+    const filled = boxesAt + Math.max(0, boxes.length - 1) * T.box + T.arrive + T.think + T.drag + T.fill;
+
+    // The frame's outline and hairlines are drawn over it, and the frame itself
+    // takes over once the block is finished, in the same places.
     if (frame) {
       const f = relative(frame, box);
+      const style = getComputedStyle(frame);
       const outline = document.createElement("div");
       outline.className = "build-outline";
-      outline.style.borderRadius = getComputedStyle(frame).borderTopLeftRadius;
+      outline.style.borderRadius = style.borderTopLeftRadius;
       outline.style.left = `${f.x}px`;
       outline.style.top = `${f.y}px`;
+      outline.style.width = `${f.w}px`;
+      outline.style.height = `${f.h}px`;
       overlay.append(outline);
-      const drawnOutline = marquee(overlay, "hollow");
-      const drawing = at + T.arrive;
+      const pen = trace(overlay, f, parseFloat(style.borderTopLeftRadius) || 0);
+      const home = pen.point(0);
+      const down = ripple(overlay, home);
+      const up = ripple(overlay, home);
+      const penned = at + T.arrive + T.think;
       jobs.push(
-        this.job(block, at, { x: f.x, y: f.y }, [
+        this.job(block, "layout", at, home, [
+          { at: at + T.arrive, dur: T.think, think: true, apply: () => {}, point: () => home },
+          { at: penned, dur: T.ripple, apply: down },
           {
-            at: drawing,
+            at: penned,
             dur: T.outline,
             shape: "cross",
-            apply: (p) => {
-              const e = easeOut(p);
-              outline.style.width = `${f.w * e}px`;
-              outline.style.height = `${f.h * e}px`;
-              outline.style.visibility = p > 0 ? "visible" : "hidden";
-              drawnOutline.draw(f, e);
-            },
-            point: (p) => ({ x: f.x + f.w * easeOut(p), y: f.y + f.h * easeOut(p) }),
+            press: true,
+            apply: (p) => pen.draw(easeInOut(p) * pen.length),
+            point: (p) => pen.point(easeInOut(p) * pen.length),
           },
-          { at: drawing + T.outline, dur: T.release, apply: (p) => drawnOutline.fade(1 - p) },
+          { at: penned + T.outline, dur: T.ripple, apply: up },
+          // The pen's line settles into the frame's own.
+          {
+            at: penned + T.outline,
+            dur: T.release * 2,
+            apply: (p) => {
+              outline.style.visibility = p > 0 ? "visible" : "hidden";
+              pen.fade(1 - p);
+            },
+          },
         ]),
       );
 
       const segments = dividers(rects);
       if (segments.length) {
-        const steps: Step[] = [];
-        let cursorAt = at + T.arrive;
+        const guides = segments.map((segment) => columnGuide(overlay, segment, f));
+        const steps: Step[] = [{ at: at + T.arrive, dur: T.think, think: true, apply: () => {}, point: () => guides[0].from }];
+        let cursorAt = at + T.arrive + T.think;
+        let last = guides[0].from;
+        const hopTo = (to: Point) => {
+          const from = last;
+          const dur = hopFor(from, to);
+          steps.push({ at: cursorAt, dur, shape: "cross", apply: () => {}, point: (p) => lerp(from, to, easeInOut(p)) });
+          cursorAt += dur;
+        };
+        for (const guide of guides) {
+          if (guide !== guides[0]) hopTo(guide.from);
+          steps.push({
+            at: cursorAt,
+            dur: T.guide,
+            shape: "cross",
+            press: true,
+            apply: (p) => guide.drop(easeOut(p)),
+            point: (p) => lerp(guide.from, guide.to, easeOut(p)),
+          });
+          cursorAt += T.guide;
+          last = guide.to;
+        }
+        // The agent waits for the boxes, then rules each hairline over its guide, and the guide goes.
+        cursorAt = Math.max(cursorAt, filled);
         segments.forEach((segment, index) => {
           const grow = hairline(overlay, segment);
           const drawnRule = marquee(overlay, "band");
-          if (index > 0) {
-            const hop = along(segments[index - 1], 1);
-            const start = along(segment, 0);
-            steps.push({ at: cursorAt, dur: T.hop, shape: "cross", apply: () => {}, point: (p) => lerp(hop, start, easeInOut(p)) });
-            cursorAt += T.hop;
-          }
+          hopTo(along(segment, 0));
           steps.push(
             {
               at: cursorAt,
               dur: T.divider,
               shape: "cross",
+              press: true,
               apply: (p) => {
                 const e = easeOut(p);
                 grow(e);
@@ -604,11 +916,19 @@ export class Conductor {
               },
               point: (p) => along(segment, easeOut(p)),
             },
-            { at: cursorAt + T.divider, dur: T.release, apply: (p) => drawnRule.fade(1 - p) },
+            {
+              at: cursorAt + T.divider,
+              dur: T.release,
+              apply: (p) => {
+                drawnRule.fade(1 - p);
+                guides[index].fade(1 - p);
+              },
+            },
           );
           cursorAt += T.divider;
+          last = along(segment, 1);
         });
-        jobs.push(this.job(block, at, along(segments[0], 0), steps));
+        jobs.push(this.job(block, "grid", at, guides[0].from, steps));
       }
     }
 
@@ -618,55 +938,114 @@ export class Conductor {
   }
 
   /**
-   * One box: the cursor drags out its marquee and the box fades in. Then, in
-   * reading order, it types each text, drags out each label's rule, holds each
-   * name in a selection box and lets the links appear. Typing is sped up for a
-   * long box so the whole of it, flight in aside, still fits in `T.most`.
+   * One box. Its agent stops on the corner to think, clicks and drags the
+   * marquee out with guides following the corner, and lets go; the box fills
+   * in with grey bars where its text will go. Then, in reading order, it types
+   * each text over its bars, rules each label, holds each name in a selection
+   * box and lets the links appear; a capture is uploaded and drawn in. Typing
+   * is sped up for a long box so all of it, flight in aside, fits in `T.most`.
    */
   private boxJob(block: Block, overlay: HTMLElement, box: DOMRect, el: HTMLElement, r: Rect, start: number): Job {
     const drawn = marquee(overlay);
-    const dragged = start + T.arrive;
+    const guides = smartGuides(overlay, box.width, box.height);
+    const corner = { x: r.x, y: r.y };
+    const far = { x: r.x + r.w, y: r.y + r.h };
+    const thought = start + T.arrive;
+    const dragged = thought + T.think;
     const filled = dragged + T.drag;
-    const steps: Step[] = [
-      {
-        at: dragged,
-        dur: T.drag,
-        shape: "cross",
-        apply: (p) => drawn.draw(r, easeOut(p)),
-        point: (p) => ({ x: r.x + r.w * easeOut(p), y: r.y + r.h * easeOut(p) }),
-      },
-      {
-        at: filled,
-        dur: T.fill,
-        apply: (p) => {
-          el.style.opacity = p >= 1 ? "" : String(p);
-        },
-      },
-    ];
+    const media = el.querySelector<HTMLElement>("img, video");
+    const role = media ? "media" : el.querySelector("dl") ? "data" : "copy";
 
     const work = Array.from(el.querySelectorAll<HTMLElement>("[data-type], [data-rule], [data-pick], [data-show]")).map((part) => ({
       part,
       at: relative(part, box),
       kind: part.hasAttribute("data-type") ? "type" : part.hasAttribute("data-rule") ? "rule" : part.hasAttribute("data-pick") ? "pick" : "show",
     }));
-    const typed = work.filter((piece) => piece.kind === "type").map((piece) => typer(overlay, piece.part, piece.at, linesOf(piece.part)));
-    const fixed = work.reduce((sum, piece) => sum + (piece.kind === "rule" ? T.hop + T.rule : piece.kind === "pick" ? T.hop + T.pick : piece.kind === "show" ? T.show : T.hop), 0);
-    const room = T.most - T.drag - T.release - fixed;
-    const wanted = typed.reduce((sum, text) => sum + text.chars / T.typing, 0);
+    const typed = work.filter((piece) => piece.kind === "type").map((piece) => typer(overlay, piece.part, piece.at, layoutOf(piece.part)));
+    // Names and links are not typed, but their places are held the same way until they appear.
+    const held = new Map(
+      work.filter((piece) => piece.kind === "pick" || piece.kind === "show").map((piece) => [piece.part, placeholders(overlay, piece.at, layoutOf(piece.part).pieces)]),
+    );
+    const bars = [...typed.map((text) => text.held), ...held.values()];
+
+    const steps: Step[] = [
+      { at: thought, dur: T.think, think: true, apply: () => {}, point: () => corner },
+      { at: dragged, dur: T.ripple, apply: ripple(overlay, corner) },
+      {
+        at: dragged,
+        dur: T.drag,
+        shape: "cross",
+        press: true,
+        apply: (p) => {
+          const e = easeOut(p);
+          drawn.draw(r, e);
+          guides.draw(p > 0 ? { x: r.x + r.w * e, y: r.y + r.h * e } : null);
+        },
+        point: (p) => ({ x: r.x + r.w * easeOut(p), y: r.y + r.h * easeOut(p) }),
+      },
+      { at: filled, dur: T.ripple, apply: ripple(overlay, far) },
+      { at: filled, dur: T.release, apply: (p) => guides.fade(1 - p) },
+      {
+        at: filled,
+        dur: T.fill,
+        apply: (p) => {
+          el.style.opacity = p >= 1 ? "" : String(p);
+          for (const bar of bars) bar.fade(p);
+          drawn.settle(p >= 1);
+        },
+      },
+    ];
+
+    const fixed =
+      (media ? T.hop + T.upload + T.wipe : 0) +
+      work.reduce((sum, piece) => sum + (piece.kind === "rule" ? T.hop + T.rule : piece.kind === "pick" ? T.hop + T.pick : piece.kind === "show" ? T.show : T.hop), 0);
+    const room = Math.max(0.4, T.most - T.drag - T.fill - T.release - fixed);
+    const wanted = typed.reduce((sum, text) => sum + text.weight / T.typing, 0);
     const pace = wanted > room ? room / wanted : 1;
 
-    let cursorAt = filled;
-    let from: Point = { x: r.x + r.w, y: r.y + r.h };
+    let cursorAt = filled + T.fill;
+    let from: Point = far;
     let next = 0;
     const hopTo = (to: Point, shape: Shape) => {
       const hop = from;
       steps.push({ at: cursorAt, dur: T.hop, shape, apply: () => {}, point: (p) => lerp(hop, to, easeInOut(p)) });
       cursorAt += T.hop;
     };
+
+    if (media) {
+      // The capture is dropped on the phone, uploads, and is drawn in from the top.
+      const phone = relative(media.parentElement ?? media, box);
+      const centre = { x: phone.x + phone.w / 2, y: phone.y + phone.h / 2 };
+      const bar = uploadBar(overlay, phone);
+      hopTo(centre, "arrow");
+      steps.push(
+        { at: cursorAt, dur: T.ripple, apply: ripple(overlay, centre) },
+        {
+          at: cursorAt,
+          dur: T.upload,
+          apply: (p) => {
+            bar(p);
+            if (p < 1) media.style.clipPath = "inset(0 0 100% 0)";
+          },
+          point: () => centre,
+        },
+        {
+          at: cursorAt + T.upload,
+          dur: T.wipe,
+          apply: (p) => {
+            if (p >= 1) media.style.removeProperty("clip-path");
+            else media.style.clipPath = `inset(0 0 ${((1 - easeInOut(p)) * 100).toFixed(2)}% 0)`;
+          },
+        },
+      );
+      cursorAt += T.upload + T.wipe;
+      from = centre;
+    }
+
     for (const piece of work) {
       if (piece.kind === "type") {
         const text = typed[next++];
-        const dur = (text.chars / T.typing) * pace;
+        const dur = (text.weight / T.typing) * pace;
         hopTo(text.point(0), "beam");
         steps.push({ at: cursorAt, dur, shape: "beam", apply: text.apply, point: text.point });
         cursorAt += dur;
@@ -681,6 +1060,7 @@ export class Conductor {
             at: cursorAt,
             dur: T.rule,
             shape: "cross",
+            press: true,
             apply: (p) => {
               const e = easeOut(p);
               rule.style.transformOrigin = p >= 1 ? "" : "left";
@@ -693,57 +1073,64 @@ export class Conductor {
         );
         cursorAt += T.rule;
         from = along(segment, 1);
-      } else if (piece.kind === "pick" && linesOf(piece.part).length) {
+      } else if (piece.kind === "pick" && layoutOf(piece.part).lines.length) {
         // A name is not typed: it appears whole, held in a selection box.
         const name = piece.part;
-        const lines = linesOf(name);
+        const { lines } = layoutOf(name);
         const left = Math.min(...lines.map((line) => line.left));
         const right = Math.max(...lines.map((line) => line.right));
-        const held: Rect = {
+        const top = Math.min(...lines.map((line) => line.top));
+        const around: Rect = {
           x: piece.at.x + left - 4,
-          y: piece.at.y + Math.min(...lines.map((line) => line.top)) - 2,
+          y: piece.at.y + top - 2,
           w: right - left + 8,
-          h: Math.max(...lines.map((line) => line.bottom)) - Math.min(...lines.map((line) => line.top)) + 4,
+          h: Math.max(...lines.map((line) => line.bottom)) - top + 4,
         };
         const drawnName = marquee(overlay, "band");
-        const corner = { x: held.x + held.w, y: held.y + held.h };
-        hopTo(corner, "arrow");
+        const place = held.get(name);
+        const end = { x: around.x + around.w, y: around.y + around.h };
+        hopTo(end, "arrow");
         steps.push(
+          { at: cursorAt, dur: T.ripple, apply: ripple(overlay, end) },
           {
             at: cursorAt,
             dur: T.pick,
             shape: "arrow",
             apply: (p) => {
               name.style.opacity = p > 0 ? "" : "0";
-              drawnName.draw(held, p > 0 ? 1 : 0);
+              drawnName.draw(around, p > 0 ? 1 : 0);
+              place?.eat(p > 0 ? Infinity : -1);
             },
-            point: () => corner,
+            point: () => end,
           },
           { at: cursorAt + T.pick, dur: T.release, apply: (p) => drawnName.fade(1 - p) },
         );
         cursorAt += T.pick;
-        from = corner;
+        from = end;
       } else {
         const links = piece.part;
+        const place = held.get(links);
         steps.push({
           at: cursorAt,
           dur: T.show,
           apply: (p) => {
             links.style.opacity = p >= 1 ? "" : String(p);
+            place?.eat(p > 0 ? Infinity : -1);
           },
         });
         cursorAt += T.show;
       }
     }
     steps.push({ at: Math.max(filled + T.fill, cursorAt), dur: T.release, apply: (p) => drawn.fade(1 - p) });
-    return this.job(block, start, { x: r.x, y: r.y }, steps);
+    return this.job(block, role, start, corner, steps);
   }
 
-  private job(block: Block, start: number, first: Point | null, steps: Step[]): Job {
+  private job(block: Block, role: string, start: number, first: Point | null, steps: Step[]): Job {
     const manned = steps.filter((step) => step.point);
     const free = manned.length ? Math.max(...manned.map((step) => step.at + step.dur)) : start;
     return {
       block,
+      role,
       start,
       steps,
       last: steps.map(() => -1),
@@ -780,7 +1167,7 @@ export class Conductor {
     block.overlay = null;
     block.jobs = [];
     block.state = "done";
-    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule], [data-type], [data-pick], [data-show]"), frameOf(block.el)]) {
+    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule], [data-type], [data-pick], [data-show], [data-box] img, [data-box] video"), frameOf(block.el)]) {
       if (el && !el.getAttribute("style")) el.removeAttribute("style");
     }
     this.entering?.unobserve(block.el);
@@ -788,10 +1175,13 @@ export class Conductor {
   }
 
   private release(cursor: Cursor) {
+    cursor.idleSince = now();
     if (cursor.job) cursor.job.cursor = null;
     cursor.job = null;
     cursor.flight = null;
     cursor.shape = "arrow";
+    cursor.press = false;
+    cursor.think = false;
   }
 
   /**
@@ -834,7 +1224,6 @@ export class Conductor {
   private frame() {
     const t = now();
     let busy = false;
-    let waiting = false;
 
     for (const block of this.blocks.values()) {
       if (block.state !== "running" || block.mode !== "build" || !block.visible) continue;
@@ -847,22 +1236,17 @@ export class Conductor {
             job.last[index] = p;
           }
         });
-        if (t < job.free) {
-          waiting = true;
-          if (!job.manned && t >= job.start) this.man(job, t);
-        }
+        if (t < job.free && !job.manned && t >= job.start) this.man(job, t);
       }
     }
 
-    // The screen is built: after a moment the idle cursors fly off the nearest side.
-    if (waiting) this.quietSince = -1;
-    else if (this.quietSince < 0) this.quietSince = t;
-    const leave = !waiting && t - this.quietSince >= T.linger;
-    const view = leave ? this.view() : null;
+    // A cursor left without work for a moment flies off the nearest side.
+    let view: ReturnType<Conductor["view"]> | null = null;
 
     this.cursors.forEach((cursor, index) => {
       if (cursor.job) this.steer(cursor, t);
-      else if (cursor.shown && !cursor.leaving && view) {
+      else if (cursor.shown && !cursor.leaving && t - cursor.idleSince >= T.linger) {
+        view ??= this.view();
         const toRight = cursor.pos.x > (view.left + view.right) / 2;
         // One already out of sight, by a block scrolled away, just parks.
         if (cursor.pos.y < view.top - 40 || cursor.pos.y > view.bottom + 40) cursor.shown = false;
@@ -918,6 +1302,7 @@ export class Conductor {
     }
     best.leaving = null;
     best.job = job;
+    best.role = job.role;
     job.cursor = best;
     const firstAt = Math.min(...job.steps.filter((step) => step.point).map((step) => step.at));
     best.flight = { from: { ...best.pos }, at: t, dur: Math.max(T.late, firstAt - t) };
@@ -932,30 +1317,42 @@ export class Conductor {
     }
     let point = job.first;
     let shape: Shape = "arrow";
+    let press = false;
+    let think = false;
     for (const step of job.steps) {
       if (!step.point || t < step.at) continue;
-      point = step.point(clamp01((t - step.at) / step.dur));
+      const p = clamp01((t - step.at) / step.dur);
+      point = step.point(p);
       shape = step.shape ?? "arrow";
+      press = !!step.press && p < 1;
+      think = !!step.think && p < 1;
     }
     const target = { x: job.block.origin.x + point.x, y: job.block.origin.y + point.y };
     if (cursor.flight) {
       const p = clamp01((t - cursor.flight.at) / cursor.flight.dur);
       cursor.pos = arc(cursor.flight.from, target, easeInOut(p), 0.08);
       cursor.shape = "arrow";
+      cursor.press = cursor.think = false;
       if (p >= 1) cursor.flight = null;
       return;
     }
     cursor.pos = target;
     cursor.shape = shape;
+    cursor.press = press;
+    cursor.think = think;
   }
 
   private draw(cursor: Cursor) {
-    const drawn = cursor.shown ? `${cursor.pos.x.toFixed(1)},${cursor.pos.y.toFixed(1)},${cursor.shape}` : "";
+    const { pos, shape, press, think, role } = cursor;
+    const drawn = cursor.shown ? `${pos.x.toFixed(1)},${pos.y.toFixed(1)},${shape},${press},${think},${role}` : "";
     if (drawn === cursor.drawn) return;
     cursor.drawn = drawn;
     cursor.el.style.visibility = cursor.shown ? "visible" : "hidden";
     if (!cursor.shown) return;
-    cursor.el.style.transform = `translate3d(${cursor.pos.x.toFixed(1)}px, ${cursor.pos.y.toFixed(1)}px, 0)`;
-    cursor.el.dataset.shape = cursor.shape;
+    // A held button presses the cursor in a little.
+    cursor.el.style.transform = `translate3d(${pos.x.toFixed(1)}px, ${pos.y.toFixed(1)}px, 0)${press ? " scale(0.84)" : ""}`;
+    cursor.el.dataset.shape = shape;
+    cursor.el.toggleAttribute("data-think", think);
+    if (cursor.tag.textContent !== role) cursor.tag.textContent = role;
   }
 }
