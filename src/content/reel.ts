@@ -47,10 +47,9 @@ export const REEL_ASPECT = 16 / 9;
 /**
  * The grown video, inside a gutter all round. On a landscape screen it is the
  * largest box of the reel's shape that fits, so the whole frame stays on
- * screen (the cut sets type close to its edges). On a portrait screen it is
- * the whole padded screen, with the video letterboxed in the middle
- * (`portrait:object-contain`) and the caption below it. The work section's
- * curtain opens on the same box.
+ * screen (the cut sets type close to its edges). The reel only grows on
+ * landscape screens; for a portrait one this returns the whole padded screen.
+ * The work section's curtain opens on the same box.
  */
 export function fitReel(width: number, height: number, gutter: number): { width: number; height: number } {
   const w = Math.max(width - gutter * 2, 1);

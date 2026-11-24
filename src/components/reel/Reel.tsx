@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import { motion } from "motion/react";
 import { Decode, Lines, Rise } from "@/components/motion/Text";
@@ -9,6 +9,7 @@ import { fitReel, reel, timestamp } from "@/content/reel";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { reducedMotion } from "@/lib/motion";
 import { useReducedMotion } from "@/lib/useReducedMotion";
+import { viewportHeight } from "@/lib/viewport";
 
 // Scroll spent on each phase of the takeover, in viewport heights.
 const GROW_VH = 1.5; // tile grows until only a margin of the page is left around it
@@ -21,6 +22,134 @@ const TEXT_GONE_AT = 0.6; // share of the grow by which all text has left
 const hasVideo = reel.sources.length > 0;
 const clamp = (value: number) => Math.min(Math.max(value, 0), 1);
 
+type TakeoverParts = {
+  section: HTMLElement;
+  slot: HTMLElement;
+  stage: HTMLElement;
+  cover: HTMLElement;
+  topRef: RefObject<HTMLDivElement | null>;
+  bottomRef: RefObject<HTMLDivElement | null>;
+  sideRef: RefObject<HTMLDivElement | null>;
+  hintRef: RefObject<HTMLParagraphElement | null>;
+  chromeRef: RefObject<HTMLDivElement | null>;
+  mediaRef: RefObject<(HTMLVideoElement & HTMLImageElement) | null>;
+  coveredRef: RefObject<boolean>;
+};
+
+/** The landscape takeover: pins the section and grows the tile. Returns its cleanup. */
+function takeover({ section, slot, stage, cover, topRef, bottomRef, sideRef, hintRef, chromeRef, mediaRef, coveredRef }: TakeoverParts) {
+  const ease = gsap.parseEase("power2.inOut");
+  // Everything the frame loop needs, measured on refresh.
+  const m = { vw: 1, vh: 1, s0: 1, insetX: 0, insetY: 0, dx: 0, grow: 1, total: 1 };
+
+  /** Offset of the tile's centre inside the section, ignoring transforms and pinning. */
+  const slotCentre = () => {
+    let x = slot.offsetWidth / 2;
+    let y = slot.offsetHeight / 2;
+    for (let node: HTMLElement | null = slot; node && node !== section; node = node.offsetParent as HTMLElement | null) {
+      x += node.offsetLeft;
+      y += node.offsetTop;
+    }
+    return { x, y };
+  };
+
+  const measure = () => {
+    m.vw = document.documentElement.clientWidth;
+    m.vh = viewportHeight();
+    // The stage is laid out at its grown size, so grown it sits at scale 1.
+    // At rest it is scaled down until it just covers the tile, and the clip
+    // trims whatever sticks out past the tile (only the tall phone panel does).
+    const pad = parseFloat(getComputedStyle(section).paddingLeft) || 0;
+    const grown = fitReel(m.vw, m.vh, pad);
+    const width = slot.offsetWidth;
+    const height = slot.offsetHeight;
+    m.s0 = Math.max(width / grown.width, height / grown.height);
+    m.insetX = (grown.width - width / m.s0) / 2;
+    m.insetY = (grown.height - height / m.s0) / 2;
+    const centre = slotCentre();
+    m.dx = m.vw / 2 - centre.x;
+    m.grow = (m.vw < 768 ? GROW_VH_PHONE : GROW_VH) * m.vh;
+    m.total = m.grow + (HOLD_VH + COVER_VH) * m.vh;
+
+    stage.dataset.takeover = "";
+    stage.style.width = `${grown.width}px`;
+    stage.style.height = `${grown.height}px`;
+    stage.style.marginLeft = `${-grown.width / 2}px`;
+    stage.style.marginTop = `${-grown.height / 2}px`;
+
+    // Pull the next section up so that it reaches the top of the screen
+    // exactly as the pin lets go: it scrolls over the fixed video instead
+    // of following it. The distance is where the section's bottom edge
+    // sits on screen while pinned.
+    cover.style.marginBottom = `${-(m.vh / 2 - centre.y + section.offsetHeight)}px`;
+  };
+
+  const apply = (progress: number) => {
+    const g = ease(clamp((progress * m.total) / m.grow));
+    const rest = 1 - g;
+    const scale = m.s0 + (1 - m.s0) * g;
+    stage.style.transform = `translate3d(${(m.dx * g).toFixed(2)}px,0,0) scale(${scale.toFixed(5)})`;
+    // Corners keep the same radius on screen at every size.
+    stage.style.clipPath = `inset(${(m.insetY * rest).toFixed(2)}px ${(m.insetX * rest).toFixed(2)}px round ${(TILE_RADIUS / scale).toFixed(2)}px)`;
+
+    // Text leaves along its own axis and is gone before the video gets there.
+    const out = clamp(g / TEXT_GONE_AT);
+    if (topRef.current) topRef.current.style.transform = `translate3d(${(-6 * out).toFixed(2)}vw, ${(-125 * out).toFixed(2)}%, 0)`;
+    if (bottomRef.current) bottomRef.current.style.transform = `translate3d(${(6 * out).toFixed(2)}vw, ${(125 * out).toFixed(2)}%, 0)`;
+    if (sideRef.current) {
+      sideRef.current.style.opacity = (1 - out).toFixed(3);
+      sideRef.current.style.transform = `translate3d(0, ${(32 * out).toFixed(1)}px, 0) scale(${(1 - 0.04 * out).toFixed(4)})`;
+    }
+    if (hintRef.current) hintRef.current.style.opacity = (1 - clamp(g * 4)).toFixed(3);
+    // Caption and sound control belong to the grown state only.
+    const chrome = chromeRef.current;
+    if (chrome) {
+      const on = clamp((g - 0.92) / 0.08);
+      chrome.style.opacity = on.toFixed(3);
+      chrome.style.pointerEvents = on > 0.99 ? "auto" : "none";
+    }
+  };
+
+  ScrollTrigger.addEventListener("refreshInit", measure);
+  measure();
+
+  ScrollTrigger.create({
+    trigger: slot,
+    start: "center center",
+    end: () => `+=${m.total}`,
+    pin: section,
+    scrub: true,
+    invalidateOnRefresh: true,
+    onRefresh: (self) => apply(self.progress),
+    onUpdate: (self) => apply(self.progress),
+    // Once the next section has covered the video there is nothing to play for.
+    onLeave: () => {
+      coveredRef.current = true;
+      if (hasVideo) mediaRef.current?.pause();
+    },
+    onEnterBack: () => {
+      coveredRef.current = false;
+      if (hasVideo) void mediaRef.current?.play().catch(() => {});
+    },
+  });
+
+  return () => {
+    ScrollTrigger.removeEventListener("refreshInit", measure);
+    delete stage.dataset.takeover;
+    for (const prop of ["width", "height", "margin-left", "margin-top", "transform", "clip-path"]) {
+      stage.style.removeProperty(prop);
+    }
+    cover.style.marginBottom = "";
+    // What the frame loop wrote, so a turn to portrait finds the section at rest.
+    for (const el of [topRef.current, bottomRef.current, sideRef.current]) el?.style.removeProperty("transform");
+    sideRef.current?.style.removeProperty("opacity");
+    hintRef.current?.style.removeProperty("opacity");
+    chromeRef.current?.style.removeProperty("opacity");
+    chromeRef.current?.style.removeProperty("pointer-events");
+    coveredRef.current = false;
+  };
+}
+
 /**
  * The showreel. At rest it is an ordinary composed section: a two-part
  * headline around a paragraph, a chapter list and the video as one small
@@ -32,6 +161,12 @@ const clamp = (value: number) => Math.min(Math.max(value, 0), 1);
  *
  * The video is laid out at its grown size from the start and only ever
  * scaled, so the picture is not resampled or distorted on the way.
+ *
+ * Only landscape screens without a touch screen get the takeover. On a
+ * portrait screen the grown 16:9 picture would be a thin strip in a tall
+ * black stage, and on a touch screen turning the phone would rebuild the
+ * pin under a video playing full screen. There the tile stays a tile: a tap
+ * plays it full screen and the chapters become a row of chips under it.
  */
 export function Reel() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -43,8 +178,11 @@ export function Reel() {
   const sideRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLParagraphElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
+  const chaptersRef = useRef<HTMLOListElement>(null);
   const mediaRef = useRef<HTMLVideoElement & HTMLImageElement>(null);
   const coveredRef = useRef(false);
+  /** Where the page was when the tile went full screen: turning the phone re-flows the page under it. */
+  const returnRef = useRef<number | null>(null);
 
   const [chapter, setChapter] = useState(0);
   const [muted, setMuted] = useState(true);
@@ -58,110 +196,9 @@ export function Reel() {
       const stage = stageRef.current;
       const cover = coverRef.current;
       if (!section || !slot || !stage || !cover || reducedMotion()) return;
-
-      const ease = gsap.parseEase("power2.inOut");
-      // Everything the frame loop needs, measured on refresh.
-      const m = { vw: 1, vh: 1, s0: 1, insetX: 0, insetY: 0, dx: 0, grow: 1, total: 1 };
-
-      /** Offset of the tile's centre inside the section, ignoring transforms and pinning. */
-      const slotCentre = () => {
-        let x = slot.offsetWidth / 2;
-        let y = slot.offsetHeight / 2;
-        for (let node: HTMLElement | null = slot; node && node !== section; node = node.offsetParent as HTMLElement | null) {
-          x += node.offsetLeft;
-          y += node.offsetTop;
-        }
-        return { x, y };
-      };
-
-      const measure = () => {
-        m.vw = document.documentElement.clientWidth;
-        m.vh = window.innerHeight;
-        // The stage is laid out at its grown size, so grown it sits at scale 1.
-        // At rest it is scaled down until it just covers the tile, and the clip
-        // trims whatever sticks out past the tile (only the tall phone panel does).
-        const pad = parseFloat(getComputedStyle(section).paddingLeft) || 0;
-        const grown = fitReel(m.vw, m.vh, pad);
-        const width = slot.offsetWidth;
-        const height = slot.offsetHeight;
-        m.s0 = Math.max(width / grown.width, height / grown.height);
-        m.insetX = (grown.width - width / m.s0) / 2;
-        m.insetY = (grown.height - height / m.s0) / 2;
-        const centre = slotCentre();
-        m.dx = m.vw / 2 - centre.x;
-        m.grow = (m.vw < 768 ? GROW_VH_PHONE : GROW_VH) * m.vh;
-        m.total = m.grow + (HOLD_VH + COVER_VH) * m.vh;
-
-        stage.dataset.takeover = "";
-        stage.style.width = `${grown.width}px`;
-        stage.style.height = `${grown.height}px`;
-        stage.style.marginLeft = `${-grown.width / 2}px`;
-        stage.style.marginTop = `${-grown.height / 2}px`;
-
-        // Pull the next section up so that it reaches the top of the screen
-        // exactly as the pin lets go: it scrolls over the fixed video instead
-        // of following it. The distance is where the section's bottom edge
-        // sits on screen while pinned.
-        cover.style.marginBottom = `${-(m.vh / 2 - centre.y + section.offsetHeight)}px`;
-      };
-
-      const apply = (progress: number) => {
-        const g = ease(clamp((progress * m.total) / m.grow));
-        const rest = 1 - g;
-        const scale = m.s0 + (1 - m.s0) * g;
-        stage.style.transform = `translate3d(${(m.dx * g).toFixed(2)}px,0,0) scale(${scale.toFixed(5)})`;
-        // Corners keep the same radius on screen at every size.
-        stage.style.clipPath = `inset(${(m.insetY * rest).toFixed(2)}px ${(m.insetX * rest).toFixed(2)}px round ${(TILE_RADIUS / scale).toFixed(2)}px)`;
-
-        // Text leaves along its own axis and is gone before the video gets there.
-        const out = clamp(g / TEXT_GONE_AT);
-        if (topRef.current) topRef.current.style.transform = `translate3d(${(-6 * out).toFixed(2)}vw, ${(-125 * out).toFixed(2)}%, 0)`;
-        if (bottomRef.current) bottomRef.current.style.transform = `translate3d(${(6 * out).toFixed(2)}vw, ${(125 * out).toFixed(2)}%, 0)`;
-        if (sideRef.current) {
-          sideRef.current.style.opacity = (1 - out).toFixed(3);
-          sideRef.current.style.transform = `translate3d(0, ${(32 * out).toFixed(1)}px, 0) scale(${(1 - 0.04 * out).toFixed(4)})`;
-        }
-        if (hintRef.current) hintRef.current.style.opacity = (1 - clamp(g * 4)).toFixed(3);
-        // Caption and sound control belong to the grown state only.
-        const chrome = chromeRef.current;
-        if (chrome) {
-          const on = clamp((g - 0.92) / 0.08);
-          chrome.style.opacity = on.toFixed(3);
-          chrome.style.pointerEvents = on > 0.99 ? "auto" : "none";
-        }
-      };
-
-      ScrollTrigger.addEventListener("refreshInit", measure);
-      measure();
-
-      ScrollTrigger.create({
-        trigger: slot,
-        start: "center center",
-        end: () => `+=${m.total}`,
-        pin: section,
-        scrub: true,
-        invalidateOnRefresh: true,
-        onRefresh: (self) => apply(self.progress),
-        onUpdate: (self) => apply(self.progress),
-        // Once the next section has covered the video there is nothing to play for.
-        onLeave: () => {
-          coveredRef.current = true;
-          if (hasVideo) mediaRef.current?.pause();
-        },
-        onEnterBack: () => {
-          coveredRef.current = false;
-          if (hasVideo) void mediaRef.current?.play().catch(() => {});
-        },
-      });
-
-      return () => {
-        ScrollTrigger.removeEventListener("refreshInit", measure);
-        delete stage.dataset.takeover;
-        for (const prop of ["width", "height", "margin-left", "margin-top", "transform", "clip-path"]) {
-          stage.style.removeProperty(prop);
-        }
-        cover.style.marginBottom = "";
-      };
+      gsap.matchMedia().add("(orientation: landscape) and (not (pointer: coarse))", () =>
+        takeover({ section, slot, stage, cover, topRef, bottomRef, sideRef, hintRef, chromeRef, mediaRef, coveredRef }),
+      );
     },
     { scope: sectionRef },
   );
@@ -189,6 +226,65 @@ export function Reel() {
       video.removeEventListener("timeupdate", onTime);
     };
   }, []);
+
+  // At rest the chips scroll sideways, so the playing chapter is kept in view.
+  useEffect(() => {
+    const row = chaptersRef.current;
+    const chip = row?.children[chapter] as HTMLElement | undefined;
+    if (!row || !chip || row.scrollWidth <= row.clientWidth) return;
+    const left = chip.offsetLeft - row.offsetLeft;
+    if (left < row.scrollLeft || left + chip.offsetWidth > row.scrollLeft + row.clientWidth) {
+      row.scrollTo({ left: left - 16, behavior: "smooth" });
+    }
+  }, [chapter]);
+
+  // Full screen shows the browser's own controls, and lets go of the rotation on the way out.
+  useEffect(() => {
+    const video = mediaRef.current;
+    if (!hasVideo || !video) return;
+    let settle = 0;
+    const restore = () => {
+      window.removeEventListener("resize", wait);
+      const y = returnRef.current;
+      returnRef.current = null;
+      if (y !== null) window.scrollTo({ top: y, behavior: "instant" });
+    };
+    // The page re-flows over several resizes and a ScrollTrigger refresh; restore once they go quiet.
+    const wait = () => {
+      window.clearTimeout(settle);
+      settle = window.setTimeout(restore, 450);
+    };
+    const onChange = () => {
+      const full = document.fullscreenElement === video;
+      video.controls = full || reducedMotion();
+      if (full || returnRef.current === null) return;
+      screen.orientation?.unlock?.();
+      window.addEventListener("resize", wait);
+      settle = window.setTimeout(restore, 900);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      window.clearTimeout(settle);
+      window.removeEventListener("resize", wait);
+      document.removeEventListener("fullscreenchange", onChange);
+    };
+  }, []);
+
+  /** At rest the tile plays full screen, turned to landscape where the browser allows it. */
+  const watch = () => {
+    const video = mediaRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (!video) return;
+    void video.play().catch(() => {});
+    returnRef.current = window.scrollY;
+    if (video.requestFullscreen) {
+      void video
+        .requestFullscreen()
+        .then(() => (screen.orientation as ScreenOrientation & { lock?: (to: string) => Promise<void> }).lock?.("landscape"))
+        .catch(() => {});
+    } else {
+      video.webkitEnterFullscreen?.();
+    }
+  };
 
   const seek = (index: number) => {
     const video = mediaRef.current;
@@ -230,7 +326,10 @@ export function Reel() {
             <Lines as="p" className="text-[clamp(17px,1.35vw,21px)] leading-[1.45] text-body">
               {reel.intro}
             </Lines>
-            <ol className="flex flex-col border-t border-line font-mono text-[12px] tracking-[0.04em]">
+            <ol
+              ref={chaptersRef}
+              className="flex flex-col border-t border-line font-mono text-[12px] tracking-[0.04em] tile:-mx-[var(--gutter)] tile:flex-row tile:gap-2 tile:overflow-x-auto tile:border-t-0 tile:px-[var(--gutter)] tile:[scrollbar-width:none]"
+            >
               {reel.chapters.map((item, i) => {
                 const active = hasVideo && i === chapter;
                 const row = (
@@ -240,18 +339,19 @@ export function Reel() {
                       <motion.span
                         layoutId="reel-chapter"
                         aria-hidden="true"
-                        className="absolute inset-y-0 left-0 w-[2px] bg-ink"
+                        className="absolute inset-y-0 left-0 w-[2px] bg-ink tile:hidden"
                         transition={{ type: "spring", stiffness: 420, damping: 38 }}
                       />
                     )}
-                    <span className="w-10 shrink-0 tabular-nums text-muted">{timestamp(item.at)}</span>
+                    <span className="w-10 shrink-0 tabular-nums text-muted tile:w-auto">{timestamp(item.at)}</span>
                     <span className={active ? "text-ink" : "text-body"}>{item.name}</span>
-                    <span className="min-w-0 flex-1 truncate text-right text-muted">{item.note}</span>
+                    <span className="min-w-0 flex-1 truncate text-right text-muted tile:hidden">{item.note}</span>
                   </>
                 );
-                const rowClass = "relative flex w-full items-baseline gap-4 border-b border-line py-2 pl-3 text-left";
+                // At rest: a chip, at least 44px tall, in a row that scrolls sideways.
+                const rowClass = `relative flex w-full items-baseline gap-4 border-b border-line py-2 pl-3 text-left tile:h-11 tile:w-auto tile:items-center tile:gap-2 tile:whitespace-nowrap tile:rounded-full tile:border tile:px-4 ${active ? "tile:border-ink" : ""}`;
                 return (
-                  <li key={i}>
+                  <li key={i} className="tile:shrink-0">
                     {hasVideo ? (
                       <button type="button" onClick={() => seek(i)} aria-current={active} className={`${rowClass} hover:text-ink`}>
                         {row}
@@ -280,7 +380,7 @@ export function Reel() {
                         poster={reel.poster}
                         controls={reduced}
                         aria-label="Showreel: rury, ruyah, the Claude Code Connector, QuExchange, Tasks, Pixan and gdgkiit.in in use"
-                        className="h-full w-full object-cover portrait:object-contain"
+                        className="h-full w-full object-cover"
                       >
                         {reel.sources.map((source) => (
                           <source key={source.src} src={source.src} type={source.type} />
@@ -293,7 +393,7 @@ export function Reel() {
                         alt="Placeholder frame for the showreel, which is still being cut"
                         fill
                         sizes="100vw"
-                        className="object-cover portrait:object-contain"
+                        className="object-cover"
                       />
                     )}
                   </div>
@@ -318,8 +418,20 @@ export function Reel() {
                   )}
                 </div>
               </div>
+              {hasVideo && (
+                <button
+                  type="button"
+                  onClick={watch}
+                  aria-label="Watch the reel full screen"
+                  className="absolute inset-0 z-20 hidden items-end justify-end rounded-[20px] p-3 tile:flex"
+                >
+                  <span aria-hidden="true" className="kicker rounded-full bg-ground/70 px-3 py-2 !text-ink backdrop-blur">
+                    Full screen ⤢
+                  </span>
+                </button>
+              )}
             </div>
-            <p ref={hintRef} aria-hidden="true" className="kicker mt-3 motion-reduce:hidden">
+            <p ref={hintRef} aria-hidden="true" className="kicker mt-3 motion-reduce:hidden tile:hidden">
               Keep scrolling ↓
             </p>
           </div>

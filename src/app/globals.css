@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* The reel at rest: portrait screens and touch screens, which never get its takeover. */
+@custom-variant tile {
+  @media (orientation: portrait) {
+    @slot;
+  }
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+
 /* One material: white dots on neutral dark. Blue means in progress, lime means done. */
 :root {
   --ground: #19191b;
