@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ScrollTrigger } from "@/lib/gsap";
 import { reducedMotion } from "@/lib/motion";
+import { onViewportChange, viewportHeight } from "@/lib/viewport";
 
 const MAX_BLUR_PX = 14;
 const MAX_DIM = 0.45; // how far the page behind sinks towards the ground colour
@@ -31,14 +32,15 @@ export function FooterCurtain() {
     if (!veil || !(page instanceof HTMLElement) || !(footer instanceof HTMLElement)) return;
 
     // Hold the page: a negative sticky offset equal to the part of it that
-    // does not fit the viewport pins its bottom edge to the viewport's.
+    // does not fit the viewport pins its bottom edge to the viewport's. The
+    // small viewport, so a phone's address bar sliding away cannot move it.
     const hold = () => {
       page.style.position = "sticky";
-      page.style.top = `${Math.min(0, window.innerHeight - page.offsetHeight)}px`;
+      page.style.top = `${Math.min(0, viewportHeight() - page.offsetHeight)}px`;
     };
     const sizes = new ResizeObserver(hold);
     sizes.observe(page);
-    window.addEventListener("resize", hold);
+    const stopViewport = onViewportChange(hold);
     hold();
 
     // Blur follows the scroll, so it is skipped under reduced motion: the
@@ -57,7 +59,7 @@ export function FooterCurtain() {
             footer.style.setProperty("--reveal", progress.toFixed(3));
             // The gap this opens under the page is always behind the footer,
             // which rises several times faster.
-            const drift = (progress * DRIFT_VH * window.innerHeight) / 100;
+            const drift = (progress * DRIFT_VH * viewportHeight()) / 100;
             page.style.transform = progress > 0 ? `translate3d(0, ${(-drift).toFixed(1)}px, 0)` : "";
           },
         });
@@ -66,7 +68,7 @@ export function FooterCurtain() {
       blur?.kill();
       footer.style.removeProperty("--reveal");
       sizes.disconnect();
-      window.removeEventListener("resize", hold);
+      stopViewport();
       page.style.transform = "";
       page.style.position = "";
       page.style.top = "";
