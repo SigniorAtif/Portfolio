@@ -71,10 +71,14 @@ type Job = {
   cursor: Cursor | null;
   /** True once the job has been offered a cursor, whether or not one was free. */
   manned: boolean;
+  /** False for work no cursor does, such as a fade. */
+  needs: boolean;
 };
 
 type Block = {
   el: HTMLElement;
+  /** On screen. Off it, the build's clock runs on but nothing is drawn and no cursor works it. */
+  visible: boolean;
   /** Fade mode: animate the boxes one after another instead of the block. */
   each: boolean;
   mode: Mode;
@@ -354,6 +358,7 @@ export class Conductor {
   private layer: HTMLElement | null = null;
   private opened = false;
   private entering: IntersectionObserver | null = null;
+  private seen: IntersectionObserver | null = null;
   private ticking = false;
   private quietSince = -1;
   private readonly tick = () => this.frame();
@@ -370,12 +375,20 @@ export class Conductor {
       return { el, colour: CURSOR_COLOURS[index % CURSOR_COLOURS.length], pos: { x: 0, y: 0 }, shape: "arrow" as Shape, shown: false, job: null, flight: null, leaving: null, drawn: "" };
     });
     window.addEventListener("resize", this.onResize);
+    this.seen = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const block = this.blocks.get(entry.target as HTMLElement);
+        if (block) this.see(block, entry.isIntersecting);
+      }
+    });
+    for (const block of this.blocks.values()) if (block.mode === "build") this.seen.observe(block.el);
   }
 
   /** Hides a block until it enters. Under reduced motion it is simply there. */
   register(el: HTMLElement, { each = false }: { each?: boolean } = {}) {
     const block: Block = {
       el,
+      visible: true,
       each,
       mode: modeNow(),
       state: "pending",
@@ -400,6 +413,7 @@ export class Conductor {
       if (frame) hideFrame(frame);
     }
     el.addEventListener("focusin", block.onFocus);
+    if (block.mode === "build") this.seen?.observe(el);
     if (this.opened) this.watch([block]);
   }
 
@@ -407,6 +421,7 @@ export class Conductor {
     const block = this.blocks.get(el);
     if (!block) return;
     this.blocks.delete(el);
+    this.seen?.unobserve(el);
     this.finish(block);
     el.removeEventListener("focusin", block.onFocus);
   }
@@ -432,6 +447,8 @@ export class Conductor {
   destroy() {
     for (const block of [...this.blocks.values()]) this.unregister(block.el);
     this.entering?.disconnect();
+    this.seen?.disconnect();
+    this.seen = null;
     this.entering = null;
     this.opened = false;
     this.stop();
@@ -713,6 +730,7 @@ export class Conductor {
       end: Math.max(...steps.map((step) => step.at + step.dur)),
       cursor: null,
       manned: !first,
+      needs: !!first,
     };
   }
 
@@ -753,6 +771,31 @@ export class Conductor {
     cursor.shape = "arrow";
   }
 
+  /**
+   * A block going off screen keeps its clock but loses its cursors, which park
+   * out of sight, and is no longer drawn. Back on screen it is drawn at
+   * whatever point its timeline has reached, and work still under way gets a
+   * cursor again, flown straight in.
+   */
+  private see(block: Block, visible: boolean) {
+    if (block.visible === visible) return;
+    block.visible = visible;
+    if (visible) {
+      if (block.state === "running") this.run();
+      return;
+    }
+    for (const job of block.jobs) {
+      if (!job.needs) continue;
+      job.manned = false;
+      const cursor = job.cursor;
+      if (!cursor) continue;
+      this.release(cursor);
+      cursor.shown = false;
+      cursor.leaving = null;
+      this.draw(cursor);
+    }
+  }
+
   private run() {
     if (this.ticking) return;
     this.ticking = true;
@@ -771,7 +814,7 @@ export class Conductor {
     let waiting = false;
 
     for (const block of this.blocks.values()) {
-      if (block.state !== "running" || block.mode !== "build") continue;
+      if (block.state !== "running" || block.mode !== "build" || !block.visible) continue;
       busy = true;
       for (const job of block.jobs) {
         job.steps.forEach((step, index) => {
@@ -798,7 +841,9 @@ export class Conductor {
       if (cursor.job) this.steer(cursor, t);
       else if (cursor.shown && !cursor.leaving && view) {
         const toRight = cursor.pos.x > (view.left + view.right) / 2;
-        cursor.leaving = {
+        // One already out of sight, by a block scrolled away, just parks.
+        if (cursor.pos.y < view.top - 40 || cursor.pos.y > view.bottom + 40) cursor.shown = false;
+        else cursor.leaving = {
           from: { ...cursor.pos },
           to: { x: toRight ? view.right + 32 : view.left - 32, y: cursor.pos.y + (index % 2 ? 40 : -40) },
           at: t + (index % 6) * 0.05,
