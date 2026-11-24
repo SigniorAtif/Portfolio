@@ -121,7 +121,13 @@ export function SiteMark({ page }: { page?: string }) {
         <nav aria-label="Primary" className="site-mark-fold site-mark-links">
           <div>
             {pages.map((link) => (
-              <PageLink key={link.href} href={link.href} aria-current={link.href === page ? "page" : undefined} onClick={closeOnTap}>
+              <PageLink
+                key={link.href}
+                href={link.href}
+                aria-current={link.href === page ? "page" : undefined}
+                onClick={closeOnTap}
+                className="hit"
+              >
                 {link.label}
               </PageLink>
             ))}

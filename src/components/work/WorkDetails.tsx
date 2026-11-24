@@ -130,7 +130,7 @@ export function WorkDetails({ projects, focused }: { projects: Project[]; focuse
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`${project.name}: ${link.says}`}
-                        className="link-line -my-3 inline-flex items-baseline py-3 text-body transition-colors duration-300 hover:text-ink"
+                        className="link-line hit -my-3 inline-flex items-baseline py-3 text-body transition-colors duration-300 hover:text-ink"
                       >
                         <SwapLabel>{link.label}</SwapLabel>
                         <span aria-hidden="true" className="arrow">

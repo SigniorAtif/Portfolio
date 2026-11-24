@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { isHomeIntro, trackLoad, whenStageOpen } from "@/lib/stage";
+import { isHomeIntro, stageOpen, trackLoad, whenStageOpen } from "@/lib/stage";
 
 const POSITION_RANGE = 1.25; // must match pack() in tools/bust/bake.py
 const RING_PX = 56;
@@ -162,23 +162,42 @@ async function loadPoints(file: string, onProgress: (fraction: number) => void):
     offset += chunk.length;
   }
 
-  const view = new DataView(bytes.buffer);
+  // tools/bust/squeeze.py writes it gzipped. A host that decodes it on the
+  // way hands over the payload instead, so only unzip what is still zipped.
+  const data =
+    bytes[0] === 0x1f && bytes[1] === 0x8b
+      ? new Uint8Array(
+          await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer(),
+        )
+      : bytes;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  if (view.getUint32(0) !== 0x42535432) throw new Error("bust points: not a BST2 file");
   const count = view.getUint32(4, true);
   const positions = new Float32Array(count * 3);
   const normals = new Float32Array(count * 3);
   const flags = new Float32Array(count);
-  const posAt = 8;
-  const normAt = posAt + count * 6;
-  const flagAt = normAt + count * 3;
-  for (let i = 0; i < count * 3; i++) {
-    positions[i] = (view.getInt16(posAt + i * 2, true) / 32767) * POSITION_RANGE;
-    normals[i] = view.getInt8(normAt + i) / 127;
-  }
   const edges = new Float32Array(count);
-  const edgeAt = flagAt + count;
+
+  // Each axis is a run of deltas from the point before: positions as int16
+  // split into a low-byte and a high-byte plane, normals as int8. Both wrap,
+  // so summing them in unsigned arithmetic and reading the sign at the end
+  // gives back the exact baked values.
+  let at = 8;
+  for (let axis = 0; axis < 3; axis++, at += count * 2) {
+    for (let i = 0, v = 0; i < count; i++) {
+      v = (v + (data[at + i] | (data[at + count + i] << 8))) & 0xffff;
+      positions[i * 3 + axis] = ((v < 0x8000 ? v : v - 0x10000) / 32767) * POSITION_RANGE;
+    }
+  }
+  for (let axis = 0; axis < 3; axis++, at += count) {
+    for (let i = 0, n = 0; i < count; i++) {
+      n = (n + data[at + i]) & 0xff;
+      normals[i * 3 + axis] = (n < 0x80 ? n : n - 0x100) / 127;
+    }
+  }
   for (let i = 0; i < count; i++) {
-    flags[i] = bytes[flagAt + i];
-    edges[i] = bytes[edgeAt + i] / 255;
+    flags[i] = data[at + i];
+    edges[i] = data[at + count + i] / 255;
   }
   return { count, positions, normals, flags, edges };
 }
@@ -190,7 +209,7 @@ function randoms(count: number) {
 }
 
 /** The dot portrait. Fills its parent; the pointer anywhere on the page moves the light. */
-export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
+export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lightRef = useRef<HTMLSpanElement>(null);
@@ -279,6 +298,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     let frame = 0;
     let disposed = false;
     let visible = true;
+    let running = false; // the loop has started: the points are in and the stage is open
     let assembleStart = 0;
     let last = performance.now();
     let nextGlint = Infinity;
@@ -289,8 +309,12 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     const light = { x: -0.45, y: 0.6 }; // stage coordinates, -1..1
 
     const tick = (now: number) => {
+      // Off screen the loop stops altogether; the watcher below restarts it.
+      if (!visible) {
+        frame = 0;
+        return;
+      }
       frame = requestAnimationFrame(tick);
-      if (!visible) return;
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       uniforms.uTime.value = now / 1000;
@@ -350,6 +374,7 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
     const watcher = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       last = performance.now();
+      if (visible && running && !frame) frame = requestAnimationFrame(tick);
     });
     watcher.observe(root);
 
@@ -377,15 +402,21 @@ export function BustStage({ file = "/bust/points.bin" }: { file?: string }) {
           if (reduced) uniforms.uAssemble.value = 1;
           else assembleStart = performance.now() - SETTLED_MS;
           settle = true;
+          running = true;
           tick(performance.now());
           report(1);
           return;
         }
 
+        // The veil stops waiting for a slow download. Points that land after it
+        // has lifted assemble all the same, but fade in rather than appear.
+        const late = stageOpen();
         report(1);
         await whenStageOpen();
         if (disposed) return;
+        if (late) canvas.animate({ opacity: [0, 1] }, { duration: 700, easing: "ease-out" });
         assembleStart = performance.now();
+        running = true;
         frame = requestAnimationFrame(tick);
       })
       .catch(() => {
