@@ -60,8 +60,8 @@ export default function WorkPage() {
           <section aria-label="Where next" className="px-[var(--gutter)] pb-[clamp(88px,14vh,180px)] pt-[clamp(56px,8vw,120px)]">
             <Build each className="grid gap-3 sm:grid-cols-2">
               <PageLink href="/about" data-box className={door}>
-                <span className="kicker">Next</span>
-                <span className="text-[clamp(40px,6vw,96px)] font-medium leading-none tracking-[-0.04em]">
+                <span data-type className="kicker">Next</span>
+                <span data-type className="text-[clamp(40px,6vw,96px)] font-medium leading-none tracking-[-0.04em]">
                   About
                   <span aria-hidden="true" className="arrow">
                     ↗
@@ -69,8 +69,8 @@ export default function WorkPage() {
                 </span>
               </PageLink>
               <a href={`mailto:${site.email}`} data-box className={door}>
-                <span className="kicker">Say hello</span>
-                <span className="mt-auto text-[clamp(22px,2.8vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] [overflow-wrap:anywhere]">
+                <span data-type className="kicker">Say hello</span>
+                <span data-type className="mt-auto text-[clamp(22px,2.8vw,44px)] font-medium leading-[1.05] tracking-[-0.03em] [overflow-wrap:anywhere]">
                   {site.email}
                   <span aria-hidden="true" className="arrow">
                     ↗

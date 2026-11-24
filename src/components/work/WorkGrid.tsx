@@ -79,7 +79,7 @@ export function WorkGrid({ projects }: { projects: Project[] }) {
 /** A cell's label, with a rule running out to the cell's edge. */
 function Label({ children }: { children: ReactNode }) {
   return (
-    <p className="kicker flex items-center gap-3">
+    <p data-type className="kicker flex items-center gap-3">
       {children}
       <span aria-hidden="true" data-rule className="h-px grow bg-line" />
     </p>
@@ -106,12 +106,12 @@ function Row({ project }: { project: Project }) {
         className={`grid h-full gap-px overflow-hidden rounded-[20px] border border-line bg-line transition-colors duration-300 ease-[var(--ease-hover)] hover:border-line-strong has-[:focus-visible]:border-line-strong md:grid-cols-2 xl:min-h-[clamp(352px,25vw,400px)] ${tracks}`}
       >
         <div data-box className={cell}>
-          <p className="kicker tabular-nums">
+          <p data-type className="kicker tabular-nums">
             {two(project.order)} <span className="px-1.5">/</span> {project.kind}
           </p>
           <div className="mt-auto flex flex-col gap-3 pt-6">
-            <h3 className="text-[clamp(26px,2.1vw,32px)] font-medium leading-[1.02] tracking-[-0.03em] [overflow-wrap:anywhere]">{project.name}</h3>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-[0.12em]">
+            <h3 data-pick className="text-[clamp(26px,2.1vw,32px)] font-medium leading-[1.02] tracking-[-0.03em] [overflow-wrap:anywhere]">{project.name}</h3>
+            <div data-show className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-[0.12em]">
               {links.length ? (
                 links.map((link) => (
                   <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`${project.name}: ${link.says}`} className="link-line hit py-1">
@@ -130,21 +130,21 @@ function Row({ project }: { project: Project }) {
 
         <div data-box className={cell}>
           <Label>What it is</Label>
-          <p className="text-[clamp(21px,1.75vw,27px)] font-medium leading-[1.2] tracking-[-0.02em]">{project.oneLiner}</p>
+          <p data-type className="text-[clamp(21px,1.75vw,27px)] font-medium leading-[1.2] tracking-[-0.02em]">{project.oneLiner}</p>
         </div>
 
         <div data-box className={`${cell} ${howSpan}`}>
           <Label>How it works</Label>
           {/* Capped for the rows where this cell runs on across an empty track. */}
-          <p className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
-          <ul className="flex flex-wrap gap-1.5">
+          <p data-type className="max-w-[60ch] text-[16px] leading-[1.55] text-body">{project.summary}</p>
+          <ul data-type className="flex flex-wrap gap-1.5">
             {project.stack.map((item) => (
               <li key={item} className={chip}>
                 {item}
               </li>
             ))}
           </ul>
-          {project.credit && <p className="mt-auto font-mono text-[12px] tracking-[0.04em] text-muted">{project.credit}</p>}
+          {project.credit && <p data-type className="mt-auto font-mono text-[12px] tracking-[0.04em] text-muted">{project.credit}</p>}
         </div>
 
         {lead && (
@@ -153,7 +153,7 @@ function Row({ project }: { project: Project }) {
             {/* The lead fact runs across the top. The cell is a container, so the lesser facts take two
                 columns only where their phrase labels have room; an odd one out at the end takes the
                 full width rather than sit beside an empty half. */}
-            <dl className="grid gap-x-4 @[13rem]:grid-cols-2">
+            <dl data-type className="grid gap-x-4 @[13rem]:grid-cols-2">
               <div className={`col-span-full flex flex-col-reverse gap-2 ${rest.length ? "pb-5" : ""}`}>
                 <dt className="text-[13px] leading-[1.4] text-muted">{lead.label}</dt>
                 <dd className="text-[clamp(48px,4.4vw,68px)] font-medium leading-none tracking-[-0.04em]">{lead.value}</dd>

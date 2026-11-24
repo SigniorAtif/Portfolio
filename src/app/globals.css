@@ -1826,6 +1826,23 @@ body {
   top: 0;
   background: var(--line);
 }
+/* Typing: the line being typed is selected, and the caret takes its agent's colour. */
+.build-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  background: color-mix(in srgb, var(--progress) 32%, transparent);
+}
+.build-caret {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+}
 .build-size {
   position: absolute;
   left: 0;

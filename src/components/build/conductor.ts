@@ -1,6 +1,6 @@
 import { gsap } from "@/lib/gsap";
 import { DUR, EASE, IN_VIEW, STAGGER, staggerFor } from "@/lib/motion";
-import { CURSOR_COUNT, makeCursor, type Shape } from "./cursors";
+import { CURSOR_COLOURS, CURSOR_COUNT, makeCursor, type Shape } from "./cursors";
 
 // The conductor runs the agent-cursor build on a page: a block is put
 // together box by box by a flock of cursors as it enters the screen.
@@ -23,14 +23,18 @@ function modeNow(): Mode {
 
 /** Seconds. */
 const T = {
-  arrive: 0.28, // a cursor's flight to its box's corner
-  drag: 0.3, // the marquee, corner to corner
-  fill: 0.3, // the box's content fades in
-  release: 0.14, // the marquee and its handles go
+  arrive: 0.24, // a cursor's flight to its box's corner
+  drag: 0.26, // the marquee, corner to corner
+  fill: 0.2, // the box itself fades in; its text is typed after
+  release: 0.12, // the marquee and its handles go
   outline: 0.3, // a block's outline, corner to corner
-  hop: 0.1, // a cursor's move from one rule to the next
-  rule: 0.18, // a label's rule, end to end
+  hop: 0.05, // a cursor's move to its next piece of work
+  rule: 0.14, // a label's rule, end to end
   divider: 0.14, // a hairline between two boxes, end to end
+  pick: 0.16, // a name held in its selection box
+  show: 0.1, // links fade in
+  typing: 110, // characters a second, before a long box is sped up to fit
+  most: 1.2, // the longest a box may take, from its marquee starting out to its marquee gone
   box: 0.09, // between the boxes of one block
   block: 0.15, // between blocks that enter together
   open: 0.1, // after the page opens, for blocks already on screen
@@ -47,7 +51,7 @@ type Step = {
   at: number;
   dur: number;
   /** Draws the step at progress `p`. At 1 it leaves the page as it is without the build. */
-  apply: (p: number) => void;
+  apply: (p: number, job: Job) => void;
   /** Where the cursor is during the step, in block coordinates. Steps without one need no cursor. */
   point?: (p: number) => Point;
   shape?: Shape;
@@ -88,6 +92,7 @@ type Block = {
 
 type Cursor = {
   el: HTMLElement;
+  colour: string;
   pos: Point;
   shape: Shape;
   shown: boolean;
@@ -217,6 +222,111 @@ function along(s: Segment, p: number): Point {
 
 const lerp = (a: Point, b: Point, p: number): Point => ({ x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p });
 
+/** One line of laid-out text, relative to its element, with roughly how many characters it holds. */
+type Line = { left: number; right: number; top: number; bottom: number; chars: number };
+
+/**
+ * The lines an element's text is laid out in, top to bottom. Each text node's
+ * characters are shared among its line boxes by width, which is close enough
+ * for a caret that steps a character at a time.
+ */
+function linesOf(el: HTMLElement): Line[] {
+  const base = el.getBoundingClientRect();
+  const pieces: Line[] = [];
+  const range = document.createRange();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    const count = node.data.trim().length;
+    if (!count) continue;
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+    const width = rects.reduce((sum, r) => sum + r.width, 0);
+    for (const r of rects) {
+      pieces.push({
+        left: r.left - base.left,
+        right: r.right - base.left,
+        top: r.top - base.top,
+        bottom: r.bottom - base.top,
+        chars: Math.max(1, Math.round((count * r.width) / width)),
+      });
+    }
+  }
+  pieces.sort((a, b) => a.top - b.top || a.left - b.left);
+  const lines: Line[] = [];
+  for (const piece of pieces) {
+    const line = lines[lines.length - 1];
+    const middle = (piece.top + piece.bottom) / 2;
+    if (line && middle > line.top && middle < line.bottom) {
+      line.left = Math.min(line.left, piece.left);
+      line.right = Math.max(line.right, piece.right);
+      line.top = Math.min(line.top, piece.top);
+      line.bottom = Math.max(line.bottom, piece.bottom);
+      line.chars += piece.chars;
+    } else lines.push({ ...piece });
+  }
+  return lines;
+}
+
+/** How far outside its box a typed element's glyphs may reach and still show. */
+const SPILL = 48;
+
+/**
+ * Types an element's text in place. The text is laid out from the start and
+ * a clip shows it: every line above the caret, the current line up to it,
+ * nothing below. The line being typed carries a selection, the caret takes
+ * the cursor's colour, and at the end the clip, selection and caret go.
+ */
+function typer(overlay: HTMLElement, el: HTMLElement, at: Rect, lines: Line[]) {
+  const mark = document.createElement("div");
+  mark.className = "build-mark";
+  const caret = document.createElement("div");
+  caret.className = "build-caret";
+  overlay.append(mark, caret);
+  const total = lines.reduce((sum, line) => sum + line.chars, 0);
+
+  /** Line index and caret x for progress `p`. */
+  const place = (p: number) => {
+    let typed = p * total;
+    let index = 0;
+    while (index < lines.length - 1 && typed >= lines[index].chars) typed -= lines[index++].chars;
+    const line = lines[index];
+    const done = Math.min(line.chars, Math.floor(typed));
+    return { index, line, x: line.left + ((line.right - line.left) * done) / line.chars };
+  };
+
+  return {
+    chars: total,
+    apply(p: number, job: Job) {
+      if (p >= 1 || !lines.length) {
+        el.style.removeProperty("clip-path");
+        mark.style.visibility = caret.style.visibility = "hidden";
+        return;
+      }
+      const { index, line, x } = place(p);
+      const top = index ? (lines[index - 1].bottom + line.top) / 2 : -SPILL;
+      const bottom = index < lines.length - 1 ? (line.bottom + lines[index + 1].top) / 2 : at.h + SPILL;
+      const right = at.w + SPILL;
+      el.style.clipPath = `polygon(${-SPILL}px ${-SPILL}px, ${right}px ${-SPILL}px, ${right}px ${top}px, ${x}px ${top}px, ${x}px ${bottom}px, ${-SPILL}px ${bottom}px)`;
+      const shown = p > 0 ? "visible" : "hidden";
+      mark.style.visibility = caret.style.visibility = shown;
+      // Moved by transform: a caret walking along a line is not a layout shift.
+      const y = at.y + line.top;
+      mark.style.transform = `translate(${at.x + line.left}px, ${y}px)`;
+      mark.style.width = `${Math.max(0, x - line.left)}px`;
+      mark.style.height = caret.style.height = `${line.bottom - line.top}px`;
+      caret.style.transform = `translate(${at.x + x}px, ${y}px)`;
+      caret.style.background = job.cursor?.colour ?? "var(--progress)";
+    },
+    /** Where the I-beam sits: just past the caret, on the line's middle. */
+    point(p: number): Point {
+      if (!lines.length) return { x: at.x, y: at.y };
+      const { line, x } = place(p);
+      return { x: at.x + x + 6, y: at.y + (line.top + line.bottom) / 2 };
+    },
+  };
+}
+
 /** The frame of a block: the outline and the hairlines between its boxes, hidden until it is built. */
 function hideFrame(frame: HTMLElement) {
   frame.style.transition = "none";
@@ -257,7 +367,7 @@ export class Conductor {
     this.cursors = Array.from({ length: CURSOR_COUNT }, (_, index) => {
       const el = makeCursor(index);
       layer.append(el);
-      return { el, pos: { x: 0, y: 0 }, shape: "arrow" as Shape, shown: false, job: null, flight: null, leaving: null, drawn: "" };
+      return { el, colour: CURSOR_COLOURS[index % CURSOR_COLOURS.length], pos: { x: 0, y: 0 }, shape: "arrow" as Shape, shown: false, job: null, flight: null, leaving: null, drawn: "" };
     });
     window.addEventListener("resize", this.onResize);
   }
@@ -396,61 +506,7 @@ export class Conductor {
     const boxes = boxesOf(block.el);
     const rects = boxes.map((el) => relative(el, box));
 
-    const jobs: Job[] = boxes.map((el, index) => {
-      const r = rects[index];
-      const start = at + index * T.box;
-      const drawn = marquee(overlay);
-      const dragged = start + T.arrive;
-      const filled = dragged + T.drag;
-      const corner = { x: r.x + r.w, y: r.y + r.h };
-      const steps: Step[] = [
-        {
-          at: dragged,
-          dur: T.drag,
-          shape: "cross",
-          apply: (p) => drawn.draw(r, easeOut(p)),
-          point: (p) => ({ x: r.x + r.w * easeOut(p), y: r.y + r.h * easeOut(p) }),
-        },
-        {
-          at: filled,
-          dur: T.fill,
-          apply: (p) => {
-            el.style.opacity = p >= 1 ? "" : String(p);
-          },
-        },
-      ];
-      // The rule under the box's label: the crosshair hops to its start and drags it out.
-      let cursorAt = filled;
-      let from = corner;
-      for (const rule of el.querySelectorAll<HTMLElement>("[data-rule]")) {
-        const rr = relative(rule, box);
-        const segment: Segment = { x: rr.x, y: rr.y, length: rr.w, thickness: rr.h, vertical: false };
-        const start = along(segment, 0);
-        const hop = from;
-        const drawnRule = marquee(overlay, "band");
-        steps.push(
-          { at: cursorAt, dur: T.hop, shape: "cross", apply: () => {}, point: (p) => lerp(hop, start, easeInOut(p)) },
-          {
-            at: cursorAt + T.hop,
-            dur: T.rule,
-            shape: "cross",
-            apply: (p) => {
-              const e = easeOut(p);
-              rule.style.transformOrigin = p >= 1 ? "" : "left";
-              rule.style.transform = p >= 1 ? "" : `scaleX(${e})`;
-              drawnRule.draw(band(segment), e, 1);
-            },
-            point: (p) => along(segment, easeOut(p)),
-          },
-          { at: cursorAt + T.hop + T.rule, dur: T.release, apply: (p) => drawnRule.fade(1 - p) },
-        );
-        cursorAt += T.hop + T.rule;
-        from = along(segment, 1);
-      }
-      const released = Math.max(filled + T.fill, cursorAt);
-      steps.push({ at: released, dur: T.release, apply: (p) => drawn.fade(1 - p) });
-      return this.job(block, start, { x: r.x, y: r.y }, steps);
-    });
+    const jobs: Job[] = boxes.map((el, index) => this.boxJob(block, overlay, box, el, rects[index], at + index * T.box));
 
     // The frame's outline and hairlines are drawn over it by two more agents, and the
     // frame itself takes over once the block is finished, in the same places.
@@ -522,6 +578,128 @@ export class Conductor {
     block.timer = window.setTimeout(() => this.finish(block), Math.max(0, block.end - now()) * 1000 + 50);
   }
 
+  /**
+   * One box: the cursor drags out its marquee and the box fades in. Then, in
+   * reading order, it types each text, drags out each label's rule, holds each
+   * name in a selection box and lets the links appear. Typing is sped up for a
+   * long box so the whole of it, flight in aside, still fits in `T.most`.
+   */
+  private boxJob(block: Block, overlay: HTMLElement, box: DOMRect, el: HTMLElement, r: Rect, start: number): Job {
+    const drawn = marquee(overlay);
+    const dragged = start + T.arrive;
+    const filled = dragged + T.drag;
+    const steps: Step[] = [
+      {
+        at: dragged,
+        dur: T.drag,
+        shape: "cross",
+        apply: (p) => drawn.draw(r, easeOut(p)),
+        point: (p) => ({ x: r.x + r.w * easeOut(p), y: r.y + r.h * easeOut(p) }),
+      },
+      {
+        at: filled,
+        dur: T.fill,
+        apply: (p) => {
+          el.style.opacity = p >= 1 ? "" : String(p);
+        },
+      },
+    ];
+
+    const work = Array.from(el.querySelectorAll<HTMLElement>("[data-type], [data-rule], [data-pick], [data-show]")).map((part) => ({
+      part,
+      at: relative(part, box),
+      kind: part.hasAttribute("data-type") ? "type" : part.hasAttribute("data-rule") ? "rule" : part.hasAttribute("data-pick") ? "pick" : "show",
+    }));
+    const typed = work.filter((piece) => piece.kind === "type").map((piece) => typer(overlay, piece.part, piece.at, linesOf(piece.part)));
+    const fixed = work.reduce((sum, piece) => sum + (piece.kind === "rule" ? T.hop + T.rule : piece.kind === "pick" ? T.hop + T.pick : piece.kind === "show" ? T.show : T.hop), 0);
+    const room = T.most - T.drag - T.release - fixed;
+    const wanted = typed.reduce((sum, text) => sum + text.chars / T.typing, 0);
+    const pace = wanted > room ? room / wanted : 1;
+
+    let cursorAt = filled;
+    let from: Point = { x: r.x + r.w, y: r.y + r.h };
+    let next = 0;
+    const hopTo = (to: Point, shape: Shape) => {
+      const hop = from;
+      steps.push({ at: cursorAt, dur: T.hop, shape, apply: () => {}, point: (p) => lerp(hop, to, easeInOut(p)) });
+      cursorAt += T.hop;
+    };
+    for (const piece of work) {
+      if (piece.kind === "type") {
+        const text = typed[next++];
+        const dur = (text.chars / T.typing) * pace;
+        hopTo(text.point(0), "beam");
+        steps.push({ at: cursorAt, dur, shape: "beam", apply: text.apply, point: text.point });
+        cursorAt += dur;
+        from = text.point(1);
+      } else if (piece.kind === "rule") {
+        const segment: Segment = { x: piece.at.x, y: piece.at.y, length: piece.at.w, thickness: piece.at.h, vertical: false };
+        const drawnRule = marquee(overlay, "band");
+        const rule = piece.part;
+        hopTo(along(segment, 0), "cross");
+        steps.push(
+          {
+            at: cursorAt,
+            dur: T.rule,
+            shape: "cross",
+            apply: (p) => {
+              const e = easeOut(p);
+              rule.style.transformOrigin = p >= 1 ? "" : "left";
+              rule.style.transform = p >= 1 ? "" : `scaleX(${e})`;
+              drawnRule.draw(band(segment), e, 1);
+            },
+            point: (p) => along(segment, easeOut(p)),
+          },
+          { at: cursorAt + T.rule, dur: T.release, apply: (p) => drawnRule.fade(1 - p) },
+        );
+        cursorAt += T.rule;
+        from = along(segment, 1);
+      } else if (piece.kind === "pick" && linesOf(piece.part).length) {
+        // A name is not typed: it appears whole, held in a selection box.
+        const name = piece.part;
+        const lines = linesOf(name);
+        const left = Math.min(...lines.map((line) => line.left));
+        const right = Math.max(...lines.map((line) => line.right));
+        const held: Rect = {
+          x: piece.at.x + left - 4,
+          y: piece.at.y + Math.min(...lines.map((line) => line.top)) - 2,
+          w: right - left + 8,
+          h: Math.max(...lines.map((line) => line.bottom)) - Math.min(...lines.map((line) => line.top)) + 4,
+        };
+        const drawnName = marquee(overlay, "band");
+        const corner = { x: held.x + held.w, y: held.y + held.h };
+        hopTo(corner, "arrow");
+        steps.push(
+          {
+            at: cursorAt,
+            dur: T.pick,
+            shape: "arrow",
+            apply: (p) => {
+              name.style.opacity = p > 0 ? "" : "0";
+              drawnName.draw(held, p > 0 ? 1 : 0);
+            },
+            point: () => corner,
+          },
+          { at: cursorAt + T.pick, dur: T.release, apply: (p) => drawnName.fade(1 - p) },
+        );
+        cursorAt += T.pick;
+        from = corner;
+      } else {
+        const links = piece.part;
+        steps.push({
+          at: cursorAt,
+          dur: T.show,
+          apply: (p) => {
+            links.style.opacity = p >= 1 ? "" : String(p);
+          },
+        });
+        cursorAt += T.show;
+      }
+    }
+    steps.push({ at: Math.max(filled + T.fill, cursorAt), dur: T.release, apply: (p) => drawn.fade(1 - p) });
+    return this.job(block, start, { x: r.x, y: r.y }, steps);
+  }
+
   private job(block: Block, start: number, first: Point | null, steps: Step[]): Job {
     const manned = steps.filter((step) => step.point);
     const free = manned.length ? Math.max(...manned.map((step) => step.at + step.dur)) : start;
@@ -552,7 +730,7 @@ export class Conductor {
       if (frame) restoreFrame(frame);
       for (const job of block.jobs) {
         job.steps.forEach((step, index) => {
-          if (job.last[index] !== 1) step.apply(1);
+          if (job.last[index] !== 1) step.apply(1, job);
           job.last[index] = 1;
         });
         if (job.cursor) this.release(job.cursor);
@@ -562,7 +740,7 @@ export class Conductor {
     block.overlay = null;
     block.jobs = [];
     block.state = "done";
-    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule]"), frameOf(block.el)]) {
+    for (const el of [...boxesOf(block.el), ...block.el.querySelectorAll("[data-rule], [data-type], [data-pick], [data-show]"), frameOf(block.el)]) {
       if (el && !el.getAttribute("style")) el.removeAttribute("style");
     }
     this.entering?.unobserve(block.el);
@@ -599,7 +777,7 @@ export class Conductor {
         job.steps.forEach((step, index) => {
           const p = step.dur > 0 ? clamp01((t - step.at) / step.dur) : t >= step.at ? 1 : 0;
           if (p !== job.last[index]) {
-            step.apply(p);
+            step.apply(p, job);
             job.last[index] = p;
           }
         });
