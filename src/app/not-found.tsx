@@ -27,7 +27,7 @@ export default function NotFound() {
         id="ufo"
         className="pointer-events-none absolute left-0 top-[8svh] w-[clamp(140px,24vw,330px)] md:left-[2%]"
       />
-      <div className="pointer-events-none absolute right-0 top-[10svh] w-[clamp(170px,26vw,400px)]">
+      <div className="pointer-events-none absolute right-0 top-[10svh] w-[clamp(170px,26vw,400px)] max-[379px]:top-[6svh] max-[379px]:w-[145px]">
         <AsciiToon id="astronaut" sharpness={2} />
         <AsciiMug className="absolute left-0 top-[-8%] w-[21%]" />
       </div>

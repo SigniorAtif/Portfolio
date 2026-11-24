@@ -69,6 +69,8 @@ export type DotSource = {
    */
   whole?: (x: number, y: number, rank: number) => boolean;
   full?: (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
+  /** Pauses the picture's own motion while it is held still (see DotCanvas), and resumes it. */
+  hold?: (still: boolean) => void;
   stop: () => void;
 };
 
@@ -83,7 +85,9 @@ type DotCanvasProps = GridProps & {
 /**
  * A picture as dot-ASCII. A dozen times a second the source draws itself
  * small, and every cell's brightness is turned into one of a few dot glyphs
- * set in the mono font. Nothing is captured while the canvas is hidden.
+ * set in the mono font. Nothing is captured while the canvas is hidden, or
+ * while an ancestor marked `data-still` holds it: that keeps the last frame,
+ * so whatever is moving the canvas only moves a still picture.
  */
 export function DotCanvas({ open, cols = 72, rows = 54, sharpness = 1, grain = 0, levels }: DotCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -124,6 +128,7 @@ export function DotCanvas({ open, cols = 72, rows = 54, sharpness = 1, grain = 0
     let cells: Uint8ClampedArray | null = null;
     let busy = false;
     let live = true;
+    let held = false;
     let cell = 1;
 
     const resize = () => {
@@ -198,6 +203,12 @@ export function DotCanvas({ open, cols = 72, rows = 54, sharpness = 1, grain = 0
     /** Have the source draw its current frame small, and repaint the glyphs from it. */
     const capture = async () => {
       if (busy || !reader || document.hidden) return;
+      const still = cells !== null && canvas.closest("[data-still]") !== null;
+      if (still !== held) {
+        held = still;
+        source.hold?.(still);
+      }
+      if (still) return;
       if (cells && canvas.checkVisibility && !canvas.checkVisibility({ visibilityProperty: true })) return;
       busy = true;
       try {
@@ -275,6 +286,7 @@ export function AsciiDrawing({ Svg, animate, cols = 72, rows = 54, sharpness, gr
             URL.revokeObjectURL(url);
           }
         },
+        hold: (still) => void timeline.paused(still || reduced),
         stop: () => timeline.kill(),
       };
     },

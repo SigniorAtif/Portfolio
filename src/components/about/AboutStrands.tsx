@@ -5,6 +5,7 @@ import { PageLink } from "@/components/transition/PageLink";
 import { Decode } from "@/components/motion/Text";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
+import { viewportHeight } from "@/lib/viewport";
 
 export type Strand = { title: string; text: string; projects: { slug: string; name: string }[] };
 
@@ -27,7 +28,7 @@ export function AboutStrands({ strands }: { strands: Strand[] }) {
       mm.add("(min-width: 900px) and (prefers-reduced-motion: no-preference)", () => {
         section.dataset.track = "";
         const travel = () => Math.max(0, track.scrollWidth - window.innerWidth);
-        const size = () => (section.style.height = `${window.innerHeight + travel()}px`);
+        const size = () => (section.style.height = `${viewportHeight() + travel()}px`);
         size();
         ScrollTrigger.addEventListener("refreshInit", size);
 
@@ -67,10 +68,10 @@ export function AboutStrands({ strands }: { strands: Strand[] }) {
               <div className="flex flex-col gap-6">
                 <h3 className="text-[clamp(40px,6.4vw,104px)] font-medium leading-[0.96] tracking-[-0.04em]">{strand.title}</h3>
                 <p className="max-w-[32rem] text-[18px] leading-[1.5] text-body">{strand.text}</p>
-                <ul className="flex flex-wrap gap-x-7 gap-y-2 pt-2 text-[18px]">
+                <ul className="flex flex-wrap gap-x-7 gap-y-2 pt-2 text-[18px] touch:gap-y-[17px]">
                   {strand.projects.map((project) => (
                     <li key={project.slug}>
-                      <PageLink href={`/work#${project.slug}`} className="link-line inline-flex items-baseline text-body hover:text-ink">
+                      <PageLink href={`/work#${project.slug}`} className="link-line hit inline-flex items-baseline text-body hover:text-ink">
                         <SwapLabel>{project.name}</SwapLabel>
                         <span aria-hidden="true" className="arrow text-sm text-muted">
                           ↗

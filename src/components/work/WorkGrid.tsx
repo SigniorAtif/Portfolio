@@ -112,7 +112,7 @@ function Row({ project }: { project: Project }) {
             <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-[0.12em]">
               {links.length ? (
                 links.map((link) => (
-                  <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`${project.name}: ${link.says}`} className="link-line py-1">
+                  <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" aria-label={`${project.name}: ${link.says}`} className="link-line hit py-1">
                     {link.label}
                     <span aria-hidden="true" className="arrow">
                       ↗

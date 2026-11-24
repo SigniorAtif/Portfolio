@@ -7,7 +7,8 @@ Samples points evenly over the surface (area weighted), drops loose specks,
 normalises to y up / +z toward the viewer / height 2, and writes:
     OUT_DIR/points.npy   N x 6 float32 (x y z nx ny nz)
     OUT_DIR/preview.png  contact sheet at several head turns
-    --bin PATH           packed file for the browser (see pack())
+    --bin PATH           packed points (see pack()); squeeze.py turns them
+                         into the public/bust/points.bust the hero loads
 """
 import argparse
 import os

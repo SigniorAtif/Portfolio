@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* The reel at rest: portrait screens and touch screens, which never get its takeover. */
+@custom-variant tile {
+  @media (orientation: portrait) {
+    @slot;
+  }
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+
 /* One material: white dots on neutral dark. Blue means in progress, lime means done. */
 :root {
   --ground: #19191b;
@@ -72,6 +82,34 @@ body {
 @media (min-width: 1024px) {
   :root {
     --gutter: 40px;
+  }
+}
+
+/* Phones and tablets: anything driven by a finger rather than a pointer. */
+@custom-variant touch {
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+
+/*
+ * A thumb-sized hit area. On a touch screen a small link or button catches
+ * taps across at least 44 by 44px, centred on it, and looks no different.
+ * It makes the element its own positioning box, so it is for links and
+ * buttons that are not positioned already.
+ */
+@utility hit {
+  @media (pointer: coarse) {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      translate: -50% -50%;
+    }
   }
 }
 
@@ -793,6 +831,38 @@ body {
 .site-mark-links a:is(:hover, :focus-visible, [aria-current="page"]) {
   color: var(--ink);
 }
+/* By touch the chip is the one way round the site, so it is made for a thumb:
+   the name and the links catch taps across 44px, the whole folded chip opens
+   it, and the chip is near opaque, so text passing under it never shows. */
+@media (pointer: coarse) {
+  .site-mark-name {
+    position: relative;
+  }
+  .site-mark-name::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+  /* Folded, the name stops being the box its hit area is placed in, so the
+     hit area fills the chip instead. */
+  .site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name {
+    position: static;
+  }
+  .site-mark[data-state="mark"]:not([data-open="true"]) .site-mark-name::after {
+    top: 0;
+    left: 0;
+    width: max(100%, 44px);
+    height: 100%;
+    translate: none;
+  }
+  .site-mark-bar::before {
+    background: color-mix(in srgb, var(--ground) 86%, transparent);
+  }
+}
 /* Unfolded past the hero: the whole page behind the bar blurs and sinks
    towards the ground colour, so the name and links are all there is to read. */
 .site-mark-frost {
@@ -1314,6 +1384,13 @@ body {
   line-height: 1;
   letter-spacing: -0.05em;
   color: var(--line-strong);
+}
+/* Below desktop widths the name is sized to the frame it starts in (56vw,
+   with the name at 1.3x), so the grow never begins with it clipped. */
+@media (max-width: 1023px) {
+  .about-desk-name {
+    font-size: 19vw;
+  }
 }
 .about-desk-caption {
   display: flex;
