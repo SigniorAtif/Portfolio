@@ -87,6 +87,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "visits",
+    name: "Welcome back",
+    hint: "Keep coming back. The fifth visit is noticed.",
+    where: "Home",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",
