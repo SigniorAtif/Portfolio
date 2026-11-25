@@ -6,6 +6,7 @@ import { AstronautSvg, animateAstronaut } from "@/components/notfound/toons/Astr
 import { CoffeeMugSvg } from "@/components/notfound/toons/CoffeeMug";
 import { DINO_SONGS, DinoSvg, animateDino, randomDinoMood } from "@/components/notfound/toons/Dino";
 import { LongBeamUfoSvg, ufo } from "@/components/notfound/toons/UFO";
+import { found } from "@/lib/eggs";
 import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { viewportHeight } from "@/lib/viewport";
 
@@ -295,7 +296,10 @@ export function ToonStage({ drift }: { drift: RefObject<number> }) {
             onPointerLeave={() => sounds(false)}
             onFocus={() => sounds(true)}
             onBlur={() => sounds(false)}
-            onClick={() => window.open(DINO_SONGS[Math.max(0, mood)], "_blank", "noopener,noreferrer")}
+            onClick={() => {
+              window.open(DINO_SONGS[Math.max(0, mood)], "_blank", "noopener,noreferrer");
+              found("dino");
+            }}
             />
           </div>
         </div>

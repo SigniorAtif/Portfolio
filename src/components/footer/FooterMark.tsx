@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Bodoni_Moda } from "next/font/google";
 import { gsap, inView, useGSAP } from "@/lib/gsap";
+import { useEggs } from "@/lib/eggs";
 import { EASE, reducedMotion } from "@/lib/motion";
 import { site } from "@/content/site";
 
@@ -18,9 +19,11 @@ const letters = [
  * The oversized name closing the footer. The letters stand on the footer's
  * bottom edge, stretched tall, and each rises out of that edge the first time
  * the mark scrolls into view. Decorative: the name is already in the footer.
+ * Once a visitor has found every easter egg, it turns lime.
  */
 export function FooterMark() {
   const ref = useRef<HTMLDivElement>(null);
+  const { complete } = useEggs();
 
   useGSAP(
     () => {
@@ -37,7 +40,7 @@ export function FooterMark() {
   );
 
   return (
-    <div ref={ref} aria-hidden="true" className={`footmark ${bodoni.className}`}>
+    <div ref={ref} aria-hidden="true" data-complete={complete || undefined} className={`footmark ${bodoni.className}`}>
       <div className="footmark-in">
         {letters.map(({ letter, last }, i) => (
           <span key={i} className={last ? "text-muted" : "text-ink"}>
