@@ -736,7 +736,9 @@ body {
     opacity var(--dur-ui) var(--ease-out),
     visibility 0s;
 }
-.site-mark[data-state="gone"] {
+.site-mark[data-state="gone"],
+/* The rury bar takes the top edge while it is up (components/eggs/RuryBar). */
+html[data-rury] .site-mark {
   opacity: 0;
   visibility: hidden;
   transition:
@@ -1130,6 +1132,127 @@ body {
     animation: cmenu-fade 0.2s linear backwards;
   }
 }
+/* The rury bar (components/eggs/RuryBar): the desktop's top bar, dropped over the
+   page in the same frosted chip. Workspaces left, window title centre, status right. */
+.rury {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 85; /* under the context menu (90), so a right-click still opens over it */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  height: 40px;
+  padding: 0 6px 0 5px;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.6);
+  font-family: var(--font-code), monospace;
+  font-size: 12px;
+  color: var(--muted);
+  animation: rury-in 0.45s var(--ease-out) backwards;
+}
+.rury[data-leaving] {
+  opacity: 0;
+  transform: translateY(calc(-100% - 12px));
+  transition:
+    opacity 0.26s var(--ease-out),
+    transform 0.26s var(--ease-out);
+}
+@keyframes rury-in {
+  from {
+    transform: translateY(calc(-100% - 12px));
+  }
+}
+.rury-workspaces {
+  display: flex;
+  gap: 2px;
+}
+.rury-workspace {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-hover) var(--ease-hover),
+    background-color var(--dur-hover) var(--ease-hover);
+  line-height: 30px;
+}
+.rury-workspace:hover,
+.rury-workspace:focus-visible {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.rury-workspace[aria-current="page"] {
+  color: var(--ground);
+  background: var(--ink);
+}
+.rury-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--body);
+}
+.rury-status {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+.rury-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--done);
+}
+/* A battery outline, a third full. */
+.rury-cell {
+  position: relative;
+  width: 18px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: linear-gradient(to right, currentColor 34%, transparent 34%) 1px 1px / calc(100% - 2px) calc(100% - 2px) no-repeat;
+}
+.rury-cell::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 2px;
+  height: 3px;
+  border-radius: 0 1px 1px 0;
+  background: currentColor;
+}
+@media (max-width: 719px) {
+  .rury {
+    grid-template-columns: 1fr auto;
+  }
+  .rury-title,
+  .rury-label {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rury {
+    animation: cmenu-fade 0.2s linear backwards;
+  }
+  .rury[data-leaving] {
+    transform: none;
+  }
+}
+
 /* Every egg found: the footer's name goes the colour of done. */
 .footmark[data-complete] span {
   color: var(--done);

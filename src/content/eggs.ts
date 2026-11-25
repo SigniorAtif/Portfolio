@@ -24,6 +24,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "rury",
+    name: "rury",
+    hint: "Type the name of the desktop this site was written in.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

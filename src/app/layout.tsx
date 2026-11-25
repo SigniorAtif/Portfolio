@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono } from "next/font/google";
+import { EggHost } from "@/components/eggs/EggHost";
 import { EggToast } from "@/components/eggs/EggToast";
 import { ContextMenu } from "@/components/nav/ContextMenu";
 import { Veil } from "@/components/transition/Veil";
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         {children}
         <ContextMenu />
+        <EggHost />
         <EggToast />
         <Veil />
         {/* Without scripts nothing would ever lift the veil. */}

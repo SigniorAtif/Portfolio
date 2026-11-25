@@ -81,6 +81,23 @@ function subscribe(listener: () => void) {
   };
 }
 
+// Eggs that can be set off from anywhere: typed keys today, later the terminal,
+// the console and the context menu. EggHost listens and plays them.
+
+export type Summon = "rury";
+const SUMMON = "egg:summon";
+
+export function summon(name: Summon) {
+  window.dispatchEvent(new CustomEvent<Summon>(SUMMON, { detail: name }));
+}
+
+/** Calls back whenever an egg is summoned. Returns the unsubscribe. */
+export function onSummon(listener: (name: Summon) => void) {
+  const handle = (event: Event) => listener((event as CustomEvent<Summon>).detail);
+  window.addEventListener(SUMMON, handle);
+  return () => window.removeEventListener(SUMMON, handle);
+}
+
 /** The finds so far. Empty on the server and until hydration. */
 export function useEggs() {
   const set = useSyncExternalStore(subscribe, read, () => EMPTY);
