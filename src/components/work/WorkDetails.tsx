@@ -78,7 +78,9 @@ export function WorkDetails({ projects, focused }: { projects: Project[]; focuse
           <span className="kicker justify-self-end">Links</span>
         </div>
 
-        <ol className="col-span-full grid grid-cols-subgrid border-t border-line">
+        {/* One layer for every row, so the sliding highlight stays under all of their text. Rows of their
+            own would paint a lower row's highlight over the row above it on the way down. */}
+        <ol className="isolate col-span-full grid grid-cols-subgrid border-t border-line">
           {projects.map((project, i) => {
             const href = project.live ?? project.source;
             const on = i === lit;
@@ -98,7 +100,7 @@ export function WorkDetails({ projects, focused }: { projects: Project[]; focuse
                   setPointed(i);
                 }}
                 onFocus={() => setPointed(i)}
-                className="relative isolate col-span-full grid scroll-mt-24 grid-cols-subgrid items-baseline gap-y-1 border-b border-line py-4 sm:py-5"
+                className="relative col-span-full grid scroll-mt-24 grid-cols-subgrid items-baseline gap-y-1 border-b border-line py-4 sm:py-5"
               >
                 {on && (
                   // One highlight that slides from row to row: the row under the pointer or

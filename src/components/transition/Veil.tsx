@@ -2,15 +2,19 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { today } from "@/content/dates";
 import { footerNav } from "@/content/site";
+import { found } from "@/lib/eggs";
 import { reducedMotion } from "@/lib/motion";
 import { jumpTo, lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { endHomeIntro, isHomeIntro, loadFraction, onLoads, resetLoads, setNavigator, setStage, type Point } from "@/lib/stage";
-import { createEngine, GREETINGS, greetingGridFor, gridFor, type EngineEvent, type Glyphs, type Grid, type HostMessage, type Size } from "./veilEngine";
+import { countVisit, pickGreetings } from "./greetings";
+import { createEngine, greetingGridFor, gridFor, type EngineEvent, type Glyphs, type Grid, type HostMessage, type Size, type Word } from "./veilEngine";
 
 // One sheet of dots over the whole site, the same material as the portrait.
 //
 // Direct home load: greetings appear in dots; the last one gathers into the portrait's ring.
+// Which words, and in what order, is up to greetings.ts.
 // Other direct loads show the page name and open with the usual entry ripple.
 //
 // Between pages: a ripple of dots spreads from the pressed link until it covers
@@ -63,46 +67,112 @@ const SCRIPTS = [
     letters: /[\u0900-\u097f]/, // Devanagari
     faces: '"Kohinoor Devanagari", "Noto Sans Devanagari", "Nirmala UI", Mangal, sans-serif',
   },
+  {
+    letters: /[\u0980-\u09ff]/, // Bengali
+    faces: '"Kohinoor Bangla", "Noto Sans Bengali", "Bangla Sangam MN", "Nirmala UI", Vrinda, sans-serif',
+  },
 ];
 const scriptOf = (text: string) => SCRIPTS.find(({ letters }) => letters.test(text));
+const fontFor = (text: string, size: number, family: string) => {
+  const script = scriptOf(text);
+  return script ? `700 ${size}px ${script.faces}` : `800 ${size}px ${family}`;
+};
+
+/**
+ * Tells whether some face on this device can draw a word, judged by its first
+ * letter outside Latin. A letter no face has comes out as the same empty box
+ * as a code point that does not exist, so the two are drawn and compared. The
+ * text is turned into dots here on the main thread whichever way the engine
+ * runs, so this one check serves the worker and the fallback alike.
+ */
+function drawableOn(pen: Pen, family: string): (text: string) => boolean {
+  const ink = (chars: string, font: string) => {
+    // Setting the size also clears the canvas and its settings.
+    pen.canvas.width = 48;
+    pen.canvas.height = 48;
+    pen.font = font;
+    pen.fillStyle = "#fff";
+    pen.textAlign = "center";
+    pen.textBaseline = "middle";
+    pen.fillText(chars, 24, 24);
+    return pen.getImageData(0, 0, 48, 48).data;
+  };
+  // The box, drawn once for each font it is asked about.
+  const boxes = new Map<string, Uint8ClampedArray>();
+  return (text) => {
+    const letter = [...text].find((char) => /[^\u0000-\u024f]/.test(char));
+    if (!letter) return true;
+    const font = fontFor(text, 28, family);
+    let box = boxes.get(font);
+    if (!box) boxes.set(font, (box = ink("\u0378", font)));
+    const word = ink(letter, font);
+    return word.some((value, i) => value !== box[i]);
+  };
+}
+
+// A phrase that would have to shrink below this share of the greetings' size
+// to fit on one line is broken onto two at its middle space instead.
+const BREAK_BELOW = 0.75;
+const LINE_GAP = 0.4; // between two lines, as a share of a capital's height
+
+/** The space nearest the middle of a phrase, or -1 for a single word. */
+function middleSpace(text: string): number {
+  let best = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === " " && (best < 0 || Math.abs(i - text.length / 2) < Math.abs(best - text.length / 2))) best = i;
+  }
+  return best;
+}
 
 /** The same open, round-dot lettering as page titles, at an intro-specific scale. */
-function greetingGlyphs(pen: Pen, viewport: Size, family: string): Glyphs {
+function greetingGlyphs(pen: Pen, viewport: Size, family: string, words: readonly Word[]): Glyphs {
   const { cell, cols, rows, left, top } = greetingGridFor(viewport.width, viewport.height);
   let size = Math.min(240, viewport.height * 0.24, viewport.width * 0.16) / cell;
-  const fontFor = (text: string) => {
-    const script = scriptOf(text);
-    return script ? `700 ${size}px ${script.faces}` : `800 ${size}px ${family}`;
-  };
+  const room = (viewport.width * 0.78) / cell; // the widest a line may be, in cells
   pen.canvas.width = cols;
   pen.canvas.height = rows;
   pen.fillStyle = "#fff";
   pen.textAlign = "center";
   pen.textBaseline = "alphabetic";
-  const words = GREETINGS.map(({ text }) => text.toUpperCase());
-  const longest = Math.max(
-    ...words.map((text) => {
-      pen.font = fontFor(text);
-      return pen.measureText(text).width;
-    }),
-  );
+  const widthOf = (text: string) => {
+    pen.font = fontFor(text, size, family);
+    return pen.measureText(text).width;
+  };
+  // Each word's lines. Only a phrase ever takes two, and only when one line
+  // would leave every word too small (a long phrase on a phone, mostly).
+  const lines = words.map(({ text }) => {
+    const upper = text.toUpperCase();
+    const space = middleSpace(upper);
+    if (space < 0 || scriptOf(upper) || room / widthOf(upper) >= BREAK_BELOW) return [upper];
+    return [upper.slice(0, space), upper.slice(space + 1)];
+  });
+  const longest = Math.max(...lines.flat().map(widthOf));
   // Every language shares a cap height and baseline, without resizing per word.
-  size *= Math.min(1, viewport.width * 0.78 / (longest * cell));
-  pen.font = fontFor("HELLO");
+  size *= Math.min(1, room / longest);
+  pen.font = fontFor("HELLO", size, family);
   const metrics = pen.measureText("HELLO");
-  const baseline = (rows + metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
+  const cap = metrics.actualBoundingBoxAscent;
+  const baseline = (rows + cap - metrics.actualBoundingBoxDescent) / 2;
 
   return {
-    greetings: words.map((text) => {
-      pen.font = fontFor(text);
-      let y = baseline;
-      if (scriptOf(text)) {
-        // Other scripts stand taller than capitals and sit differently: centre the word's own ink instead.
-        const own = pen.measureText(text);
-        y = (rows + own.actualBoundingBoxAscent - own.actualBoundingBoxDescent) / 2;
-      }
+    greetings: lines.map((text) => {
       pen.clearRect(0, 0, cols, rows);
-      pen.fillText(text, cols / 2, y);
+      if (text.length > 1) {
+        // Two lines, one capital's height apart and a little more, centred together.
+        const first = (rows - (text.length * cap + (text.length - 1) * cap * LINE_GAP)) / 2 + cap;
+        pen.font = fontFor(text[0], size, family);
+        text.forEach((line, index) => pen.fillText(line, cols / 2, first + index * cap * (1 + LINE_GAP)));
+      } else {
+        const [word] = text;
+        pen.font = fontFor(word, size, family);
+        let y = baseline;
+        if (scriptOf(word)) {
+          // Other scripts stand taller than capitals and sit differently: centre the word's own ink instead.
+          const own = pen.measureText(word);
+          y = (rows + own.actualBoundingBoxAscent - own.actualBoundingBoxDescent) / 2;
+        }
+        pen.fillText(word, cols / 2, y);
+      }
       const pixels = pen.getImageData(0, 0, cols, rows).data;
       const dots: number[] = [];
       for (let i = 0; i < cols * rows; i++) {
@@ -172,10 +242,22 @@ function createHost(
   try {
     again = sessionStorage.getItem("veil-seen") === "1";
   } catch {}
+  const visits = countVisit();
 
   // boot: the first-load greetings. covering: on the way to a page, until the
   // reveal lets the page start. opening: the rest of the reveal.
   const homeIntro = isHomeIntro();
+  // Picked once, so a resize or the fonts arriving re-measure the same words.
+  // A milestone greets once, on the first home load of its visit: a reload of
+  // home after that gets the usual run. A day's greeting greets every home load that day.
+  const picked =
+    homeIntro && !plain
+      ? pickGreetings({
+          visits: again ? 0 : visits,
+          canDraw: drawableOn(pen, family),
+          day: today()?.greeting,
+        })
+      : { words: [], milestone: false, dated: false };
   let phase: "boot" | "covering" | "opening" | "idle" = homeIntro ? "boot" : "covering";
   let target = "";
   let keepScroll = false;
@@ -190,7 +272,7 @@ function createHost(
   const buffers = (glyphs: Glyphs) => [glyphs.label?.buffer, ...(glyphs.greetings?.map(({ dots }) => dots.buffer) ?? [])].filter((buffer): buffer is ArrayBuffer => !!buffer);
   /** The text the sheet may need to spell next, measured for the current grid. */
   const glyphs = (): Glyphs => ({
-    ...(phase === "boot" && !plain ? greetingGlyphs(pen, size, family) : {}),
+    ...(phase === "boot" && !plain ? greetingGlyphs(pen, size, family, picked.words) : {}),
     ...(label ? labelGlyphs(pen, grid, family, label) : {}),
   });
 
@@ -208,6 +290,8 @@ function createHost(
     try {
       sessionStorage.setItem("veil-seen", "1");
     } catch {}
+    if (picked.milestone) found("visits");
+    if (picked.dated) found("dates");
     // On home the lit dots become the ring the portrait assembles from.
     const bust = plain ? null : document.querySelector("[data-bust]");
     if (bust) {
@@ -312,6 +396,7 @@ function createHost(
     dot: css.getPropertyValue("--dot").trim() || "#ffffff",
     plain,
     again,
+    words: picked.words,
     real: 0.2 * fontsIn + 0.2 * pageIn + 0.6 * loads,
     loads,
     glyphs: first,

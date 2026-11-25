@@ -21,27 +21,19 @@ const FRAME_X = 0.78; // the box's half-width, as a share of half the viewport
 const FRAME_Y = 0.68;
 const FRAME_BAND = 0.09; // how quickly the frame thins away from the edges
 const FRAME_LIT = 0.24; // share of the frame's dots on by the last word, an equal part per word
-const FRAME_DIM = 0.3; // how bright the last word's part is, against Hello's at full
-const HELLO_FADE_MS = 750; // Hello's soft fade in; the frame's first lights wait for it
+const FRAME_DIM = 0.3; // how bright the last word's part is, against the first word's at full
+const FIRST_FADE_MS = 750; // the first word's soft fade in; the frame's first lights wait for it
 const FRAME_FADE_MS = 450; // and then fade in themselves; later parts switch on at once
 
-// A soft first hello, then a quick, even run of languages in their own scripts
-// whose last word holds still before everything gathers into the portrait.
-// The frame's first lights fade in once Hello is fully in; each word after it
-// switches on its own, dimmer part the moment it shows. All stay on until the ring.
-// `pause` is blank time at the start of a word's turn, before the word shows.
-type Word = { text: string; ms: number; pause?: number };
-export const GREETINGS: readonly Word[] = [
-  { text: "Hello", ms: 1400, pause: 80 },
-  { text: "Hola", ms: 190 },
-  { text: "مرحبا", ms: 190 },
-  { text: "こんにちは", ms: 190 },
-  { text: "안녕하세요", ms: 190 },
-  { text: "Ciao", ms: 190 },
-  { text: "Olá", ms: 900 }, // the last word: on with the beat, then held
-];
-const CUT_MS = 35; // words in the run swap with a near cut, in and out
-const BOOT_MS = GREETINGS.reduce((total, word) => total + word.ms, 0);
+// The greetings: a soft first word, then the rest in turn, the last of them
+// held still before everything gathers into the portrait. The host picks the
+// words and their timing (greetings.ts) and sends them with `init`.
+// The frame's first lights fade in once the first word is fully in; each word
+// after it switches on its own, dimmer part the moment it shows. All stay on
+// until the ring. `pause` is blank time at the start of a word's turn, before
+// the word shows.
+export type Word = { text: string; ms: number; pause?: number };
+const CUT_MS = 35; // words after the first swap with a near cut, in and out
 
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number; dpr: number };
@@ -64,6 +56,8 @@ export type HostMessage =
       dot: string;
       plain: boolean;
       again: boolean;
+      /** The greetings to spell on a direct home load, in order; `glyphs.greetings` matches them one for one. */
+      words: readonly Word[];
       real: number;
       loads: number;
       glyphs: Glyphs;
@@ -163,6 +157,8 @@ export function createEngine(
   let live = false;
 
   // boot
+  let words: readonly Word[] = [];
+  let bootMs = 0;
   let bootStart = 0;
   let pace = 1;
   let real = 0;
@@ -271,13 +267,13 @@ export function createEngine(
       }
     }
     pool.sort((a, b) => b.key - a.key);
-    // One equal part per word, all on at once as the word appears (Hello's
+    // One equal part per word, all on at once as the word appears (the first word's
     // once its fade is done), each part dimmer than the one before.
-    const share = (pool.length * FRAME_LIT) / GREETINGS.length;
+    const share = (pool.length * FRAME_LIT) / words.length;
     let start = 0;
-    GREETINGS.forEach((word, index) => {
-      const at = start + (word.pause ?? 0) + (index === 0 ? HELLO_FADE_MS : 0);
-      const glow = mix(1, FRAME_DIM, index / (GREETINGS.length - 1));
+    words.forEach((word, index) => {
+      const at = start + (word.pause ?? 0) + (index === 0 ? FIRST_FADE_MS : 0);
+      const glow = mix(1, FRAME_DIM, words.length > 1 ? index / (words.length - 1) : 0);
       for (let i = Math.round(index * share); i < Math.round((index + 1) * share); i++) {
         const { x, y, near } = pool[i];
         sparks.push({
@@ -326,12 +322,12 @@ export function createEngine(
       const waited = now - bootStart;
       greetingAge = waited / pace;
       greetingIndex = 0;
-      while (greetingIndex < GREETINGS.length - 1 && greetingAge >= GREETINGS[greetingIndex].ms) {
-        greetingAge -= GREETINGS[greetingIndex].ms;
+      while (greetingIndex < words.length - 1 && greetingAge >= words[greetingIndex].ms) {
+        greetingAge -= words[greetingIndex].ms;
         greetingIndex++;
       }
       // A slow download holds the last word, briefly; it never restarts the greeting cycle.
-      const finishAt = plain ? 200 : BOOT_MS * pace;
+      const finishAt = plain ? 200 : bootMs * pace;
       if (!asked && waited >= finishAt && (real >= 0.999 || waited >= finishAt + LOAD_PATIENCE_MS)) {
         asked = true;
         emit({ type: "full" });
@@ -447,7 +443,7 @@ export function createEngine(
     if (mode === "boot") {
       // The frame: each word switches on its part, which stays lit. Parts are
       // stored in order, so each brightness is one run and one fill. Only
-      // Hello's part, the first, fades in.
+      // the first word's part fades in.
       const t = (now - bootStart) / pace;
       for (let i = 0; i < sparks.length && t >= sparks[i].at; ) {
         const { glow, at } = sparks[i];
@@ -464,10 +460,12 @@ export function createEngine(
 
       // Words take turns on the same baseline. Never crossfade two different
       // words on top of one another: their dots would make an illegible smear.
-      const final = greetingIndex === GREETINGS.length - 1;
-      const shown = greetingAge - (GREETINGS[greetingIndex].pause ?? 0);
-      const entrance = greetingIndex === 0 ? ease(clamp(shown / HELLO_FADE_MS)) : easeOut(shown / CUT_MS);
-      const exit = final ? 1 : ease(clamp((GREETINGS[greetingIndex].ms - greetingAge) / CUT_MS));
+      const word = words[greetingIndex];
+      if (!word) return;
+      const final = greetingIndex === words.length - 1;
+      const shown = greetingAge - (word.pause ?? 0);
+      const entrance = greetingIndex === 0 ? ease(clamp(shown / FIRST_FADE_MS)) : easeOut(shown / CUT_MS);
+      const exit = final ? 1 : ease(clamp((word.ms - greetingAge) / CUT_MS));
       drawGreeting(greetingIndex, entrance * exit);
       return;
     }
@@ -553,6 +551,8 @@ export function createEngine(
           ground = message.ground;
           dotColour = message.dot;
           pace = message.again ? 0.82 : 1;
+          words = message.words;
+          bootMs = words.reduce((total, word) => total + word.ms, 0);
           real = message.real;
           loads = message.loads;
           take(message.glyphs);

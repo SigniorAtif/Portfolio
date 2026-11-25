@@ -1,0 +1,18 @@
+#              _.---._
+#          .-''  o o  ''-.
+#         '-._____________.-'
+#              /   |   \
+#             /    |    \
+#            /     |     \
+#
+#   Hello, crawler. Read anything you like.
+#   The three below are for the humans who went looking.
+
+User-Agent: *
+Allow: /
+Disallow: /test   # the lab. toons only
+Disallow: /eggs   # you have to find them first
+Disallow: /q      # scan it, don't crawl it
+
+Host: https://www.ahmedatif.in
+Sitemap: https://www.ahmedatif.in/sitemap.xml
