@@ -1313,6 +1313,62 @@ html[data-rury] .site-mark {
   transition: color 1.2s var(--ease-out);
 }
 
+/* The toon parade (components/eggs/ToonParade): the whole cast marching along
+   the bottom of the screen. The row is moved by script; each toon hops to its
+   own beat. Under the rury bar (85) and the toast (95), and never in the way. */
+.parade {
+  --toon: clamp(64px, 9vw, 128px);
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(4px, env(safe-area-inset-bottom));
+  z-index: 80;
+  padding-top: 16px; /* room for the hop, which the clip would otherwise cut */
+  overflow: clip;
+  pointer-events: none;
+  /* A shade of the ground under the cast, so it reads over whatever the page has there. */
+  background: linear-gradient(to top, var(--ground) 35%, color-mix(in oklab, var(--ground) 70%, transparent) 70%, transparent);
+}
+.parade-row {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--toon) * 0.22);
+  width: max-content;
+}
+.parade-toon {
+  position: relative;
+  width: var(--toon);
+  animation: parade-hop 0.42s ease-in-out infinite alternate;
+}
+.parade-toon:nth-child(3n + 1) {
+  animation-delay: -0.14s;
+}
+.parade-toon:nth-child(3n + 2) {
+  animation-delay: -0.28s;
+}
+.parade-mug {
+  position: absolute;
+  left: -6%;
+  top: -8%;
+  width: 21%;
+}
+@keyframes parade-hop {
+  to {
+    transform: translateY(-9px);
+  }
+}
+/* Still: the cast stands in a row, wrapping on a narrow screen, then fades. */
+.parade[data-reduced] .parade-row {
+  flex-wrap: wrap;
+  justify-content: center;
+  width: auto;
+  max-width: calc(100vw - 32px);
+  margin-inline: auto;
+}
+.parade[data-reduced] .parade-toon {
+  animation: none;
+}
+
 /* ---------- footer ---------- */
 /* The name, stretched tall from its base. The wrapper's top padding makes room for the stretch. */
 .footmark {

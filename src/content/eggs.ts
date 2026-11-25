@@ -38,6 +38,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "parade",
+    name: "Toon parade",
+    hint: "An old cheat code still works here. Up is where it starts.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "ask",
     name: "To play chess",
     hint: "Keep rolling what you want.",

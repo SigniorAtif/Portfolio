@@ -6,10 +6,13 @@ import { onSummon, summon, type Summon } from "@/lib/eggs";
 
 // Each egg's code is its own chunk, fetched the first time it is set off.
 const RuryBar = dynamic(() => import("./RuryBar").then((mod) => mod.RuryBar), { ssr: false });
+const ToonParade = dynamic(() => import("./ToonParade").then((mod) => mod.ToonParade), { ssr: false });
 
 /** Typed sequences, as lowercased `KeyboardEvent.key` values, and the egg each one sets off. */
 const SEQUENCES: { keys: string[]; egg: Summon }[] = [
   { keys: [..."rury"], egg: "rury" },
+  // The Konami code: up up down down left right left right B A.
+  { keys: ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"], egg: "parade" },
 ];
 const LONGEST = Math.max(...SEQUENCES.map((sequence) => sequence.keys.length));
 
@@ -19,12 +22,16 @@ const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditabl
 /**
  * Listens for the typed easter eggs on every page and plays whichever is
  * summoned, by keys or by anything else that calls `summon`. Keys in a text
- * field, in the site menu, or with a modifier held are ignored. Mounted once,
- * in the root layout.
+ * field, in the site menu, or with a modifier held are ignored. Keys typed
+ * while a timed sequence holds the page still still count: the Konami code's
+ * own ArrowDown can start the work opening, which holds the page. Mounted
+ * once, in the root layout.
  */
 export function EggHost() {
   // The rury bar is mounted while `shown`, and slides away once `open` turns false.
   const [rury, setRury] = useState({ shown: false, open: false });
+  // Each summon of the parade is a new one, so a second summon starts it over. 0 while none is on.
+  const [parade, setParade] = useState(0);
 
   useEffect(() => {
     let typed: string[] = [];
@@ -50,6 +57,7 @@ export function EggHost() {
     const stop = onSummon((egg) => {
       // Typing it again puts the bar away; only that or a reload does.
       if (egg === "rury") setRury((now) => (now.open ? { shown: true, open: false } : { shown: true, open: true }));
+      if (egg === "parade") setParade((count) => count + 1);
     });
     return () => {
       window.removeEventListener("keydown", onKey);
@@ -58,10 +66,12 @@ export function EggHost() {
   }, []);
 
   const ruryClosed = useCallback(() => setRury({ shown: false, open: false }), []);
+  const paradeDone = useCallback(() => setParade(0), []);
 
   return (
     <>
       {rury.shown && <RuryBar open={rury.open} onClosed={ruryClosed} />}
+      {parade > 0 && <ToonParade key={parade} onDone={paradeDone} />}
     </>
   );
 }
