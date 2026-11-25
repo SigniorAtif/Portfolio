@@ -122,6 +122,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "dates",
+    name: "On the day",
+    hint: "The site keeps a calendar. Visit on the right day.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

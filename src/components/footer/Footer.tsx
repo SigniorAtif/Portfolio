@@ -2,6 +2,7 @@ import { PageLink } from "@/components/transition/PageLink";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { footerNav, site, socials } from "@/content/site";
 import { EndMark } from "@/components/eggs/EndMark";
+import { DayLine } from "./DayLine";
 import { FooterMark } from "./FooterMark";
 import { SpaceField } from "./SpaceField";
 
@@ -99,6 +100,7 @@ export async function Footer() {
           <p className="kicker">
             © {year} {site.name}
           </p>
+          <DayLine />
           <p className="kicker">{site.signOff}</p>
         </div>
       </div>

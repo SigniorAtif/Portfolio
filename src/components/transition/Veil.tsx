@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { today } from "@/content/dates";
 import { footerNav } from "@/content/site";
 import { found } from "@/lib/eggs";
 import { reducedMotion } from "@/lib/motion";
@@ -248,14 +249,15 @@ function createHost(
   const homeIntro = isHomeIntro();
   // Picked once, so a resize or the fonts arriving re-measure the same words.
   // A milestone greets once, on the first home load of its visit: a reload of
-  // home after that gets the usual run.
+  // home after that gets the usual run. A day's greeting greets every home load that day.
   const picked =
     homeIntro && !plain
       ? pickGreetings({
           visits: again ? 0 : visits,
           canDraw: drawableOn(pen, family),
+          day: today()?.greeting,
         })
-      : { words: [], milestone: false };
+      : { words: [], milestone: false, dated: false };
   let phase: "boot" | "covering" | "opening" | "idle" = homeIntro ? "boot" : "covering";
   let target = "";
   let keepScroll = false;
@@ -289,6 +291,7 @@ function createHost(
       sessionStorage.setItem("veil-seen", "1");
     } catch {}
     if (picked.milestone) found("visits");
+    if (picked.dated) found("dates");
     // On home the lit dots become the ring the portrait assembles from.
     const bust = plain ? null : document.querySelector("[data-bust]");
     if (bust) {
