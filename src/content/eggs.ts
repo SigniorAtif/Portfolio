@@ -73,6 +73,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "console",
+    name: "Under the hood",
+    hint: "Open the developer tools and read what the console says.",
+    where: "The console",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",
