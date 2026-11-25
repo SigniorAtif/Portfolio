@@ -90,13 +90,13 @@ export const spoken = [
   },
 ];
 
-/** What else takes his time. One of them opens an easter egg when pressed (components/eggs/HobbyEgg). */
-export const busy: { name: string; egg?: "chess" }[] = [
+/** What else takes his time. Two of them open an easter egg when pressed (components/eggs/HobbyEgg). */
+export const busy: { name: string; egg?: "chess" | "steam" }[] = [
   { name: "Al-Qur'an" },
   { name: "Poetry" },
   { name: "Physics" },
   { name: "Chess", egg: "chess" },
-  { name: "Video Games" },
+  { name: "Video Games", egg: "steam" },
 ];
 
 /** Where he is from. */
