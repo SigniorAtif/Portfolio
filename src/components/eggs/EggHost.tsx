@@ -1,8 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { QR_PENDING } from "@/content/qr";
 import { onSummon, summon, type Summon } from "@/lib/eggs";
+import { travel } from "@/lib/stage";
 
 // Each egg's code is its own chunk, fetched the first time it is set off.
 const RuryBar = dynamic(() => import("./RuryBar").then((mod) => mod.RuryBar), { ssr: false });
@@ -14,6 +17,10 @@ const SEQUENCES: { keys: string[]; egg: Summon }[] = [
   { keys: [..."rury"], egg: "rury" },
   { keys: ["`"], egg: "terminal" },
   { keys: [..."sudo"], egg: "terminal" },
+  // The QR code in the hero's dust, by what a phone does to one, or by the app that sends files that way.
+  { keys: [..."scan"], egg: "qr" },
+  { keys: [..."qr"], egg: "qr" },
+  { keys: [..."quexchange"], egg: "qr" },
   // The Konami code: up up down down left right left right B A.
   { keys: ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"], egg: "parade" },
 ];
@@ -31,6 +38,7 @@ const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditabl
  * once, in the root layout.
  */
 export function EggHost() {
+  const router = useRouter();
   // The rury bar is mounted while `shown`, and slides away once `open` turns false.
   const [rury, setRury] = useState({ shown: false, open: false });
   // Each summon of the parade is a new one, so a second summon starts it over. 0 while none is on.
@@ -64,12 +72,21 @@ export function EggHost() {
       if (egg === "rury") setRury((now) => (now.open ? { shown: true, open: false } : { shown: true, open: true }));
       if (egg === "parade") setParade((count) => count + 1);
       if (egg === "terminal") setTerminal(true);
+      // The code forms in the hero, so anywhere else goes home first and leaves a note to form it there.
+      if (egg === "qr" && window.location.pathname !== "/") {
+        try {
+          window.sessionStorage.setItem(QR_PENDING, "1");
+        } catch {
+          // Without storage the trip home still happens; the code just does not form.
+        }
+        if (!travel("/")) router.push("/");
+      }
     });
     return () => {
       window.removeEventListener("keydown", onKey);
       stop();
     };
-  }, []);
+  }, [router]);
 
   const ruryClosed = useCallback(() => setRury({ shown: false, open: false }), []);
   const paradeDone = useCallback(() => setParade(0), []);

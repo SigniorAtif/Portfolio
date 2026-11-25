@@ -115,6 +115,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "qr",
+    name: "Read through the air",
+    hint: "Type what your phone does to a square code.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

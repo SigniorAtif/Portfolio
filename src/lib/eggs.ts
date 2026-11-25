@@ -84,7 +84,7 @@ function subscribe(listener: () => void) {
 // Eggs that can be set off from anywhere: typed keys today, later the terminal,
 // the console and the context menu. EggHost listens and plays them.
 
-export type Summon = "rury" | "parade" | "terminal";
+export type Summon = "rury" | "parade" | "terminal" | "qr";
 const SUMMON = "egg:summon";
 
 export function summon(name: Summon) {

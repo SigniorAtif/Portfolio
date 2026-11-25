@@ -17,7 +17,7 @@ export type Action =
   | { kind: "open"; href: string }
   /** This tab, through the veil. */
   | { kind: "go"; href: string }
-  | { kind: "summon"; egg: "parade" | "rury" | "terminal" };
+  | { kind: "summon"; egg: "parade" | "rury" | "terminal" | "qr" };
 
 export type Result = { lines: string[]; action?: Action };
 
@@ -62,6 +62,7 @@ const HELP: [string, string][] = [
   ["eggs", "how many you have found"],
   ["parade", "summon the toons"],
   ["rury", "the bar, on or off"],
+  ["scan", "a code, drawn in the hero's dust"],
   ["sudo hire atif", "the shortest way to a note"],
   ["clear", "a clean screen"],
   ["exit", "back to the page"],
@@ -171,6 +172,8 @@ export function run(input: string, context: Context): Result {
       return { lines: ["Summoning the cast."], action: { kind: "summon", egg: "parade" } };
     case "rury":
       return { lines: ["Toggling the bar."], action: { kind: "summon", egg: "rury" } };
+    case "scan":
+      return { lines: ["Watch the portrait. Have a phone ready."], action: { kind: "summon", egg: "qr" } };
     case "hire":
       return hire;
     case "terminal":
@@ -191,7 +194,7 @@ export function run(input: string, context: Context): Result {
 }
 
 /** The words Tab can finish: commands first, then what `cat` and `open` take. */
-const COMMANDS = ["help", "ls", "cat", "open", "neofetch", "whoami", "date", "eggs", "parade", "rury", "sudo", "clear", "exit"];
+const COMMANDS = ["help", "ls", "cat", "open", "neofetch", "whoami", "date", "eggs", "parade", "rury", "scan", "sudo", "clear", "exit"];
 const TARGETS: Record<string, string[]> = {
   cat: ["about", ...projects.map((project) => project.slug)],
   open: [...Object.keys(PLACES), ...projects.map((project) => project.slug)],

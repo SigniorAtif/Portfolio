@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { found } from "@/lib/eggs";
+import { QR, QR_PENDING } from "@/content/qr";
+import { found, onSummon } from "@/lib/eggs";
+import { glideTo } from "@/lib/scrollLock";
 import { isHomeIntro, stageOpen, trackLoad, whenStageOpen } from "@/lib/stage";
 
 const POSITION_RANGE = 1.25; // must match pack() in tools/bust/bake.py
@@ -53,6 +55,19 @@ function nodAt(t: number) {
   return 0;
 }
 const NOD_S = NOD.sink + NOD.jerk + NOD.settle;
+
+// An easter egg: summoned (typing "scan", see EggHost), points drift in like dust
+// and settle into the QR code for /q on a flat grid just behind the head, hold,
+// and scatter. Dots sit on the light modules and the quiet border and the dark
+// modules stay empty, so it reads as an ordinary dark-on-light code. The dot
+// size was proven with zbarimg before it was built: anything from 0.6 decodes.
+const QR_QUIET = 4; // modules of empty border, as a scanner wants
+const QR_SIDE = QR.length + 2 * QR_QUIET;
+const QR_DOT = 0.75; // a dot's width, as a share of its module
+const QR_FILL = { h: 0.6, w: 0.84 }; // the most of the stage's height and width the code takes
+const QR_Z = -0.35; // just behind the head
+const QR_TIME = { form: 1.8, hold: 8, leave: 1.6, fade: 0.35 }; // seconds; reduced motion only fades, by `fade`
+const QR_DIM = 0.88; // how far the bust and the dust fade while the code is up
 
 const bustVertex = /* glsl */ `
   attribute vec3 aNormal;
@@ -224,6 +239,48 @@ const moteVertex = /* glsl */ `
   }
 `;
 
+const qrVertex = /* glsl */ `
+  attribute vec3 aEnd;
+  attribute vec2 aGrid;
+  attribute vec3 aRand;
+  uniform float uTime;
+  uniform float uSize;
+  uniform float uForm;
+  uniform float uLeave;
+  uniform float uQrScale;
+  uniform float uQrSize;
+  varying float vBright;
+
+  float easeInOut(float t) { return t < .5 ? 4. * t * t * t : 1. - pow(-2. * t + 2., 3.) / 2.; }
+
+  void main() {
+    // Dust until it is called, and dust again once let go: the room's own slow drift.
+    vec3 drift = vec3(sin(uTime * .05 + aRand.x * 6.28) * .25, sin(uTime * .04 + aRand.y * 6.28) * .2, 0.);
+    float f = easeInOut(clamp((uForm - aRand.x * .35) / .65, 0., 1.));
+    float l = easeInOut(clamp((uLeave - aRand.y * .3) / .7, 0., 1.));
+    vec3 home = vec3(aGrid * uQrScale, ${QR_Z.toFixed(2)}) + vec3(0., ${CAMERA_Y.toFixed(2)}, 0.);
+    vec3 p = mix(mix(position + drift, home, f), aEnd + drift, l);
+    // Bowed toward the camera on the way in and on the way out, each dot by its own amount.
+    p.z += (sin(f * 3.14159) + sin(l * 3.14159)) * (.2 + aRand.z * .4);
+    vBright = mix(.18 + aRand.z * .2, 1., f) * (1. - l);
+    vec4 mv = modelViewMatrix * vec4(p, 1.);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = mix(uSize * (.5 + aRand.z), uQrSize, f) / -mv.z;
+  }
+`;
+
+const qrFragment = /* glsl */ `
+  uniform vec3 uDot;
+  uniform float uQrOn;
+  varying float vBright;
+
+  void main() {
+    float r = length(gl_PointCoord - .5);
+    float a = 1. - smoothstep(.4, .5, r); // hard edged: a scanner wants clean dots
+    gl_FragColor = vec4(uDot, a * min(vBright, 1.) * uQrOn);
+  }
+`;
+
 const fragment = /* glsl */ `
   uniform vec3 uDot;
   uniform float uDim;
@@ -305,6 +362,29 @@ async function loadPoints(file: string, onProgress: (fraction: number) => void):
   return { count, positions, normals, flags, edges };
 }
 
+/** Places scattered through the room the dust drifts in. */
+function scattered(count: number) {
+  const out = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    out[i * 3] = (Math.random() - 0.5) * 6;
+    out[i * 3 + 1] = (Math.random() - 0.5) * 2.4 + CAMERA_Y;
+    out[i * 3 + 2] = (Math.random() - 0.5) * 2;
+  }
+  return out;
+}
+
+/** The QR code's points, as places on a unit square: every light module and every module of the border. */
+function qrGrid() {
+  const out: number[] = [];
+  for (let y = 0; y < QR_SIDE; y++) {
+    for (let x = 0; x < QR_SIDE; x++) {
+      if (QR[y - QR_QUIET]?.[x - QR_QUIET] === "#") continue;
+      out.push((x + 0.5) / QR_SIDE - 0.5, 0.5 - (y + 0.5) / QR_SIDE);
+    }
+  }
+  return new Float32Array(out);
+}
+
 function randoms(count: number) {
   const out = new Float32Array(count * 3);
   for (let i = 0; i < out.length; i++) out[i] = Math.random();
@@ -354,7 +434,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     const shared = { uniforms, fragmentShader: fragment, transparent: true, depthTest: false, depthWrite: false };
     const bustMaterial = new THREE.ShaderMaterial({ ...shared, vertexShader: bustVertex });
     const dustMaterial = new THREE.ShaderMaterial({ ...shared, vertexShader: dustVertex });
-    // The sparks stay bright while the bust dims for sleep.
+    // The sparks stay bright while the bust dims for sleep; they only give way to the QR code.
     const moteDim = { value: 1 };
     const moteMaterial = new THREE.ShaderMaterial({
       ...shared,
@@ -363,14 +443,8 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     });
 
     // A room, not a void: faint dust drifting through the whole frame.
-    const dustPositions = new Float32Array(DUST * 3);
-    for (let i = 0; i < DUST; i++) {
-      dustPositions[i * 3] = (Math.random() - 0.5) * 6;
-      dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 2.4 + CAMERA_Y;
-      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 2;
-    }
     const dustGeometry = new THREE.BufferGeometry();
-    dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
+    dustGeometry.setAttribute("position", new THREE.BufferAttribute(scattered(DUST), 3));
     dustGeometry.setAttribute("aRand", new THREE.BufferAttribute(randoms(DUST), 3));
     const dust = new THREE.Points(dustGeometry, dustMaterial);
     dust.frustumCulled = false;
@@ -384,6 +458,39 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     motes.frustumCulled = false;
     motes.visible = false;
     scene.add(motes);
+
+    // The QR egg's points, drawn over the bust and hidden until summoned. They start
+    // where they drift as dust (`position`) and leave for somewhere else (`aEnd`).
+    const grid = qrGrid();
+    const qrCount = grid.length / 2;
+    const qrGeometry = new THREE.BufferGeometry();
+    qrGeometry.setAttribute("position", new THREE.BufferAttribute(scattered(qrCount), 3));
+    qrGeometry.setAttribute("aEnd", new THREE.BufferAttribute(scattered(qrCount), 3));
+    qrGeometry.setAttribute("aGrid", new THREE.BufferAttribute(grid, 2));
+    qrGeometry.setAttribute("aRand", new THREE.BufferAttribute(randoms(qrCount), 3));
+    const qrUniforms = {
+      uTime: uniforms.uTime,
+      uSize: uniforms.uSize,
+      uDot: uniforms.uDot,
+      uForm: { value: 0 },
+      uLeave: { value: 0 },
+      uQrScale: { value: 1 },
+      uQrSize: { value: 8 },
+      uQrOn: { value: 0 },
+    };
+    const qrMaterial = new THREE.ShaderMaterial({
+      uniforms: qrUniforms,
+      vertexShader: qrVertex,
+      fragmentShader: qrFragment,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const code = new THREE.Points(qrGeometry, qrMaterial);
+    code.frustumCulled = false;
+    code.renderOrder = 1;
+    code.visible = false;
+    scene.add(code);
 
     const resize = () => {
       const width = root.clientWidth;
@@ -399,6 +506,12 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
       const worldPerPx = (2 * camera.position.z * Math.tan((FOV * Math.PI) / 360)) / height;
       uniforms.uRing.value = RING_PX * worldPerPx;
       uniforms.uSize.value = (height / 800) * DOT_PX * dpr * camera.position.z;
+      // The code, as big as the stage allows, in whole pixels a module so its edges stay sharp.
+      const modulePx = Math.floor(Math.min(height * QR_FILL.h, width * QR_FILL.w) / QR_SIDE);
+      const depth = camera.position.z - QR_Z;
+      qrUniforms.uQrScale.value = (modulePx * QR_SIDE * 2 * depth * Math.tan((FOV * Math.PI) / 360)) / height;
+      // The fragment's dot fills nine tenths of its sprite.
+      qrUniforms.uQrSize.value = (QR_DOT / 0.9) * modulePx * dpr * depth;
     };
     resize();
     const resizer = new ResizeObserver(resize);
@@ -446,6 +559,29 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
     const nodGap = () => (NOD_EVERY[0] + Math.random() * (NOD_EVERY[1] - NOD_EVERY[0])) * 1000;
     const crown = new THREE.Vector3();
     const X_AXIS = new THREE.Vector3(1, 0, 0);
+
+    // The QR egg: when it was asked for and when it began to form (0 for neither),
+    // since when the stage has been open, and how far the bust has faded for it.
+    let qrWanted = 0;
+    let qrStart = 0;
+    let openSince = 0;
+    let qrDim = 0;
+    const callQr = () => {
+      if (qrStart || qrWanted) return;
+      qrWanted = performance.now();
+      // It forms in the hero, so the page goes back up to it first.
+      if (window.scrollY > 4) glideTo(0);
+    };
+    const stopSummons = onSummon((egg) => {
+      if (egg === "qr") callQr();
+    });
+    // Summoned on another page, which sent the visitor here. The note is only
+    // cleared once the code forms, so a remount on the way does not lose it.
+    try {
+      if (window.sessionStorage.getItem(QR_PENDING)) callQr();
+    } catch {
+      // No storage, no note.
+    }
 
     const tick = (now: number) => {
       // Off screen the loop stops altogether; the watcher below restarts it.
@@ -495,6 +631,48 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
       }
       sleep += ((asleep ? 1 : 0) - sleep) * ease(asleep ? 0.5 : 4);
 
+      // The QR code forms once the portrait is whole, the stage has been open a
+      // beat, and the page is back at the top (or has stopped trying to get there).
+      if (stageOpen()) openSince ||= now;
+      else openSince = 0;
+      const atTop = window.scrollY < 4 || now - qrWanted > 2500;
+      if (qrWanted && uniforms.uAssemble.value >= 1 && openSince && now - openSince > 500 && atTop) {
+        qrWanted = 0;
+        qrStart = now;
+        code.visible = true;
+        try {
+          window.sessionStorage.removeItem(QR_PENDING);
+        } catch {
+          // Nothing to clear.
+        }
+      }
+      let form = 0;
+      let leave = 0;
+      let shown = 0;
+      if (qrStart) {
+        const t = (now - qrStart) / 1000;
+        const { form: forming, hold, leave: leaving, fade } = QR_TIME;
+        const span = reduced ? hold : forming + hold + leaving;
+        if (reduced) {
+          // No flight: it is simply there, then gone.
+          form = 1;
+          shown = Math.max(0, Math.min(1, t / fade, (span - t) / fade));
+        } else {
+          form = Math.min(1, t / forming);
+          leave = Math.max(0, Math.min(1, (t - forming - hold) / leaving));
+          shown = Math.min(1, t / 0.4);
+        }
+        if (t > span) {
+          qrStart = 0;
+          code.visible = false;
+          [form, leave, shown] = [0, 0, 0];
+        }
+      }
+      qrUniforms.uForm.value = form;
+      qrUniforms.uLeave.value = leave;
+      qrUniforms.uQrOn.value = shown;
+      qrDim += ((reduced ? shown : form * (1 - leave)) - qrDim) * ease(4);
+
       // The breath as it reaches the head, the nod, and the ember's flicker (-1 to 1:
       // slow and uneven, never a flash). All fade in and out with sleep.
       let breath = 0;
@@ -517,9 +695,10 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
       rise += dt * stirring * RISE;
       uniforms.uSleep.value = stirring;
       motes.visible = stirring > 0.001;
+      moteDim.value = 1 - qrDim;
       uniforms.uBreathT.value = clock;
       uniforms.uRise.value = rise;
-      uniforms.uDim.value = 1 - 0.45 * sleep;
+      uniforms.uDim.value = (1 - 0.45 * sleep) * (1 - QR_DIM * qrDim);
       const held = pointer.at >= 0 && now - pointer.at < IDLE_MS && Math.abs(pointer.x) < 1.3 && Math.abs(pointer.y) < 1.3;
       // The head starts following straight away, while the dots are still landing.
       let targetX: number, targetY: number, yawTo: number, pitchTo: number, headRate: number;
@@ -559,7 +738,7 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
       // The stage may be CSS-scaled, so place the star in its own layout pixels.
       lightDot.style.transform = `translate(${(light.x * 0.5 + 0.5) * root.clientWidth}px, ${(0.5 - light.y * 0.5) * root.clientHeight}px)`;
       // Asleep the light burns low on the bust, but the ember itself stays in sight.
-      lightDot.style.opacity = String(reduced ? 0 : Math.min(1, turn.on + 0.4 * sleep));
+      lightDot.style.opacity = String(reduced ? 0 : Math.min(1, turn.on + 0.4 * sleep) * (1 - qrDim));
       if (sleep > 0.01) {
         // The "z"s ride the breath and the nod with the head.
         crown.copy(CROWN).sub(NECK).applyAxisAngle(X_AXIS, sway).add(NECK);
@@ -633,12 +812,14 @@ export function BustStage({ file = "/bust/points.bust" }: { file?: string }) {
       window.removeEventListener("pointerdown", onMove);
       document.documentElement.removeEventListener("pointerleave", onLeave);
       for (const type of STIRS) window.removeEventListener(type, stir);
+      stopSummons();
       scene.traverse((object) => {
         if (object instanceof THREE.Points) object.geometry.dispose();
       });
       bustMaterial.dispose();
       dustMaterial.dispose();
       moteMaterial.dispose();
+      qrMaterial.dispose();
       renderer.dispose();
     };
   }, [file]);
