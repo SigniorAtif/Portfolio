@@ -28,7 +28,9 @@ export function AboutSkills({ skills }: { skills: Skill[] }) {
           <span className="kicker justify-self-end">Count</span>
         </div>
 
-        <FadeUp as="ol" each="cards" className="col-span-full grid grid-cols-subgrid border-t border-line">
+        {/* One layer for every row, so the sliding highlight stays under all of their text. Rows of their
+            own would paint a lower row's highlight over the row above it on the way down. */}
+        <FadeUp as="ol" each="cards" className="isolate col-span-full grid grid-cols-subgrid border-t border-line">
           {skills.map((skill, i) => {
             const on = i === lit;
             return (
@@ -37,7 +39,7 @@ export function AboutSkills({ skills }: { skills: Skill[] }) {
                 onPointerEnter={(event) => {
                   if (event.pointerType === "mouse") setLit(i);
                 }}
-                className="relative isolate col-span-full grid grid-cols-subgrid items-baseline gap-y-3 border-b border-line py-6 sm:py-8"
+                className="relative col-span-full grid grid-cols-subgrid items-baseline gap-y-3 border-b border-line py-6 sm:py-8"
               >
                 {on && (
                   <motion.span
