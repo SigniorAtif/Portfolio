@@ -1253,6 +1253,60 @@ html[data-rury] .site-mark {
   }
 }
 
+/* The sleeping bust's "z"s (components/hero/BustStage): placed over the crown by the
+   stage, each one rising and fading on its own beat while the portrait dozes. */
+.bust-zzz {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease-out);
+  font-family: var(--font-code), monospace;
+  font-style: normal;
+  color: var(--dot);
+}
+[data-asleep] > .bust-zzz {
+  opacity: 1;
+}
+.bust-zzz i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-style: normal;
+  opacity: 0;
+  animation: bust-z 3.6s ease-out infinite;
+}
+.bust-zzz i:nth-child(1) {
+  font-size: 14px;
+}
+.bust-zzz i:nth-child(2) {
+  font-size: 19px;
+  animation-delay: 1.2s;
+}
+.bust-zzz i:nth-child(3) {
+  font-size: 25px;
+  animation-delay: 2.4s;
+}
+@keyframes bust-z {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(26px, -72px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bust-zzz {
+    display: none;
+  }
+}
+
 /* Every egg found: the footer's name goes the colour of done. */
 .footmark[data-complete] span {
   color: var(--done);

@@ -24,6 +24,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "sleep",
+    name: "Asleep at the desk",
+    hint: "Leave the portrait alone for a minute and a half.",
+    where: "Home",
+    tracked: true,
+  },
+  {
     id: "rury",
     name: "rury",
     hint: "Type the name of the desktop this site was written in.",
