@@ -9,6 +9,7 @@ import { AboutStrands } from "@/components/about/AboutStrands";
 import { AboutYears } from "@/components/about/AboutYears";
 import { Sparks } from "@/components/about/Sparks";
 import { TiltPortrait } from "@/components/about/TiltPortrait";
+import { HobbyEgg } from "@/components/eggs/HobbyEgg";
 import { FadeUp } from "@/components/motion/FadeUp";
 import { Footer } from "@/components/footer/Footer";
 import { FooterCurtain } from "@/components/footer/FooterCurtain";
@@ -118,10 +119,12 @@ export default function AboutPage() {
             <div className="about-tile flex flex-col gap-4 p-[clamp(20px,2.4vw,36px)] [grid-area:busy]">
               <p className="kicker">Also busy with</p>
               <ol className="about-busy flex flex-1 flex-col border-t border-line">
-                {busy.map((item, i) => (
-                  <li key={item} className="flex flex-1 items-baseline gap-5 border-b border-line py-[clamp(10px,1.3vw,18px)] last:border-b-0">
+                {busy.map(({ name, egg }, i) => (
+                  <li key={name} className="flex flex-1 items-baseline gap-5 border-b border-line py-[clamp(10px,1.3vw,18px)] last:border-b-0">
                     <span className="kicker w-8 tabular-nums">0{i + 1}</span>
-                    <span className="text-[clamp(30px,4.6vw,72px)] font-medium leading-[1] tracking-[-0.04em]">{item}</span>
+                    <span className="text-[clamp(30px,4.6vw,72px)] font-medium leading-[1] tracking-[-0.04em]">
+                      {egg ? <HobbyEgg egg={egg}>{name}</HobbyEgg> : name}
+                    </span>
                   </li>
                 ))}
               </ol>

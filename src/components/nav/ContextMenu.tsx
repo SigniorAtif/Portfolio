@@ -12,7 +12,9 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import { PageLink } from "@/components/transition/PageLink";
+import { timeZone } from "@/content/contact";
 import { pages, site, socials } from "@/content/site";
+import { found, summon, tally } from "@/lib/eggs";
 import { glideTo } from "@/lib/scrollLock";
 import { stageOpen } from "@/lib/stage";
 
@@ -23,20 +25,30 @@ import { stageOpen } from "@/lib/stage";
 // pointer when there is one. The browser's menu stays one step away: Shift +
 // right-click, text fields, selected text, images and touch screens all get it
 // as before.
+//
+// An easter egg: Alt + right-click, or Alt pressed while the menu is open (some
+// Linux window managers keep Alt + right-click for themselves), adds a group of
+// secret rows.
 
 /** Right-clicks on these keep the browser's own menu. */
 const NATIVE = "input, textarea, select, [contenteditable]:not([contenteditable='false']), img, video, picture";
 const EDGE = 8; // least gap between the menu and the viewport's edges, in px
 const LEAVE_MS = 140; // the fade out, as in .cmenu[data-leaving]
 const DONE_MS = 700; // how long "Copied" shows before the menu closes
+const SLEEP_MS = 1400; // how long the answer to "Go to sleep" shows before the menu closes
 
 const PLACES = [{ label: "Home", href: "/" }, ...pages];
 const ITEMS = '[role="menuitem"]:not([aria-disabled="true"])';
 
 /** The link that was right-clicked, if any. */
 type Target = { href: string; label: string; mail: boolean };
-type Menu = { id: number; x: number; y: number; keyboard: boolean; link: Target | null; scrolled: boolean };
-type Done = { id: string; ok: boolean };
+type Menu = { id: number; x: number; y: number; keyboard: boolean; link: Target | null; scrolled: boolean; secret: boolean };
+/** A row's answer once pressed: "Copied" or "Couldn't copy" by `ok`, unless it has words of its own. */
+type Done = { id: string; ok: boolean; text?: string };
+
+/** The hour on Atif's clock. */
+const hourThere = () =>
+  Number(new Intl.DateTimeFormat("en-GB", { timeZone: timeZone.id, hour: "numeric", hourCycle: "h23" }).format(new Date()));
 
 function describe(anchor: HTMLAnchorElement): Target {
   const url = new URL(anchor.href);
@@ -123,6 +135,7 @@ export function ContextMenu() {
         keyboard,
         link: anchor ? describe(anchor) : null,
         scrolled: window.scrollY > window.innerHeight / 2,
+        secret: event.altKey,
       });
     };
     document.addEventListener("contextmenu", onContextMenu);
@@ -161,6 +174,11 @@ export function ContextMenu() {
     };
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") close(true);
+      if (event.key === "Alt") {
+        // Held from the browser too: alone, Alt would move focus to its menu bar.
+        event.preventDefault();
+        setMenu((now) => now && (now.secret ? now : { ...now, secret: true }));
+      }
     };
     const away = () => close();
     document.addEventListener("pointerdown", onDown, true);
@@ -179,6 +197,11 @@ export function ContextMenu() {
     };
   }, [open, close]);
 
+  const secret = menu?.secret ?? false;
+  useEffect(() => {
+    if (secret) found("secrets");
+  }, [secret]);
+
   if (!menu) return null;
 
   const copy = (id: string, text: string) => {
@@ -195,7 +218,8 @@ export function ContextMenu() {
         timer.current = window.setTimeout(() => close(), DONE_MS);
       });
   };
-  const said = (id: string, label: string) => (done?.id === id ? (done.ok ? "Copied" : "Couldn't copy") : label);
+  const answer = (now: Done) => now.text ?? (now.ok ? "Copied" : "Couldn't copy");
+  const said = (id: string, label: string) => (done?.id === id ? answer(done) : label);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const items = [...event.currentTarget.querySelectorAll<HTMLElement>(ITEMS)];
@@ -244,6 +268,8 @@ export function ContextMenu() {
 
   const row = { role: "menuitem", tabIndex: -1, className: "cmenu-item", onPointerMove: hover } as const;
   const link = menu.link;
+  const eggs = tally();
+  const late = hourThere() >= 2 && hourThere() < 5;
 
   return (
     <div
@@ -394,11 +420,67 @@ export function ContextMenu() {
         ))}
       </div>
 
+      {menu.secret && (
+        <>
+          <hr className="cmenu-rule" />
+          <div role="group" aria-label="Secrets">
+            <p aria-hidden="true" className="cmenu-kicker">
+              Secrets
+            </p>
+            <button
+              type="button"
+              {...row}
+              data-label="Summon a toon"
+              onClick={() => {
+                close();
+                summon("parade");
+              }}
+            >
+              Summon a toon
+            </button>
+            <button
+              type="button"
+              {...row}
+              data-label="Open terminal"
+              onClick={() => {
+                shut();
+                summon("terminal");
+              }}
+            >
+              Open terminal
+              <span aria-hidden="true" className="cmenu-hint">
+                `
+              </span>
+            </button>
+            <PageLink href="/eggs" {...row} data-label="Eggs found" onClick={shut}>
+              Eggs found
+              <span className="cmenu-hint">
+                {eggs.count}/{eggs.total}
+              </span>
+            </PageLink>
+            {late && (
+              <button
+                type="button"
+                {...row}
+                data-label="Go to sleep"
+                onClick={() => {
+                  window.clearTimeout(timer.current);
+                  setDone({ id: "sleep", ok: true, text: "Can't. Building something." });
+                  timer.current = window.setTimeout(() => close(), SLEEP_MS);
+                }}
+              >
+                {said("sleep", "Go to sleep")}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
       <p aria-hidden="true" className="cmenu-foot">
         Hold <kbd>Shift</kbd> for the browser&rsquo;s menu
       </p>
       <span role="status" className="sr-only">
-        {done ? (done.ok ? "Copied" : "Couldn't copy") : ""}
+        {done ? answer(done) : ""}
       </span>
     </div>
   );

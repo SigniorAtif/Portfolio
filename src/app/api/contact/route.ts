@@ -1,4 +1,4 @@
-import { asks, deadlines, noteText, type Note } from "@/content/contact";
+import { asks, deadlines, hiddenAsks, hiddenDeadlines, noteText, type Note } from "@/content/contact";
 
 /*
  * Takes a note from the contact page and mails it to Atif through Cloudflare
@@ -50,7 +50,7 @@ const reply = (status: number) => Response.json({ ok: status === 200 }, { status
 const clean = (value: unknown) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
 const fits = (value: string, max: number) => value !== "" && value.length <= max;
 
-/** The note, if every part is there, within its length, and the ask and deadline are ones the page offers. */
+/** The note, if every part is there, within its length, and the ask and deadline are ones the page offers (hidden ones included). */
 function readNote(body: unknown): Note | null {
   if (typeof body !== "object" || body === null) return null;
   const raw = body as Record<string, unknown>;
@@ -66,8 +66,8 @@ function readNote(body: unknown): Note | null {
     fits(note.thing, LIMITS.thing) &&
     fits(note.email, LIMITS.email) &&
     EMAIL.test(note.email) &&
-    asks.includes(note.ask) &&
-    deadlines.includes(note.deadline);
+    (asks.includes(note.ask) || hiddenAsks.includes(note.ask)) &&
+    (deadlines.includes(note.deadline) || hiddenDeadlines.includes(note.deadline));
   return whole ? note : null;
 }
 

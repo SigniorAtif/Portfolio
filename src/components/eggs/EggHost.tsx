@@ -1,0 +1,102 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { QR_PENDING } from "@/content/qr";
+import { onSummon, summon, type Summon } from "@/lib/eggs";
+import { travel } from "@/lib/stage";
+
+// Each egg's code is its own chunk, fetched the first time it is set off.
+const RuryBar = dynamic(() => import("./RuryBar").then((mod) => mod.RuryBar), { ssr: false });
+const ToonParade = dynamic(() => import("./ToonParade").then((mod) => mod.ToonParade), { ssr: false });
+const Terminal = dynamic(() => import("./Terminal").then((mod) => mod.Terminal), { ssr: false });
+
+/** Typed sequences, as lowercased `KeyboardEvent.key` values, and the egg each one sets off. */
+const SEQUENCES: { keys: string[]; egg: Summon }[] = [
+  { keys: [..."rury"], egg: "rury" },
+  { keys: ["`"], egg: "terminal" },
+  { keys: [..."sudo"], egg: "terminal" },
+  // The QR code in the hero's dust, by what a phone does to one, or by the app that sends files that way.
+  { keys: [..."scan"], egg: "qr" },
+  { keys: [..."qr"], egg: "qr" },
+  { keys: [..."quexchange"], egg: "qr" },
+  // The Konami code: up up down down left right left right B A.
+  { keys: ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"], egg: "parade" },
+];
+const LONGEST = Math.max(...SEQUENCES.map((sequence) => sequence.keys.length));
+
+/** Keys typed here belong to the field, never to an egg. */
+const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
+
+/**
+ * Listens for the typed easter eggs on every page and plays whichever is
+ * summoned, by keys or by anything else that calls `summon`. Keys in a text
+ * field, in the site menu, or with a modifier held are ignored. Keys typed
+ * while a timed sequence holds the page still still count: the Konami code's
+ * own ArrowDown can start the work opening, which holds the page. Mounted
+ * once, in the root layout.
+ */
+export function EggHost() {
+  const router = useRouter();
+  // The rury bar is mounted while `shown`, and slides away once `open` turns false.
+  const [rury, setRury] = useState({ shown: false, open: false });
+  // Each summon of the parade is a new one, so a second summon starts it over. 0 while none is on.
+  const [parade, setParade] = useState(0);
+  const [terminal, setTerminal] = useState(false);
+
+  useEffect(() => {
+    let typed: string[] = [];
+    const onKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(EDITABLE)) {
+        typed = [];
+        return;
+      }
+      if (target?.closest(".cmenu")) return;
+      typed = [...typed, event.key.toLowerCase()].slice(-LONGEST);
+      for (const { keys, egg } of SEQUENCES) {
+        if (typed.length >= keys.length && keys.every((key, i) => typed[typed.length - keys.length + i] === key)) {
+          // The last key belongs to the egg: unclaimed, the backtick (or the "o" of
+          // "sudo") would land in the terminal's field as it takes focus.
+          event.preventDefault();
+          typed = [];
+          summon(egg);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const stop = onSummon((egg) => {
+      // Typing it again puts the bar away; only that or a reload does.
+      if (egg === "rury") setRury((now) => (now.open ? { shown: true, open: false } : { shown: true, open: true }));
+      if (egg === "parade") setParade((count) => count + 1);
+      if (egg === "terminal") setTerminal(true);
+      // The code forms in the hero, so anywhere else goes home first and leaves a note to form it there.
+      if (egg === "qr" && window.location.pathname !== "/") {
+        try {
+          window.sessionStorage.setItem(QR_PENDING, "1");
+        } catch {
+          // Without storage the trip home still happens; the code just does not form.
+        }
+        if (!travel("/")) router.push("/");
+      }
+    });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      stop();
+    };
+  }, [router]);
+
+  const ruryClosed = useCallback(() => setRury({ shown: false, open: false }), []);
+  const paradeDone = useCallback(() => setParade(0), []);
+  const terminalClosed = useCallback(() => setTerminal(false), []);
+
+  return (
+    <>
+      {rury.shown && <RuryBar open={rury.open} onClosed={ruryClosed} />}
+      {parade > 0 && <ToonParade key={parade} onDone={paradeDone} />}
+      {terminal && <Terminal onClose={terminalClosed} />}
+    </>
+  );
+}
