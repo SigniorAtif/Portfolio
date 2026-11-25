@@ -38,6 +38,27 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "ask",
+    name: "To play chess",
+    hint: "Keep rolling what you want.",
+    where: "Contact",
+    tracked: true,
+  },
+  {
+    id: "deadline",
+    name: "Yesterday",
+    hint: "Keep rolling when you want it.",
+    where: "Contact",
+    tracked: true,
+  },
+  {
+    id: "howl",
+    name: "Howl",
+    hint: "The castle has a name. Try it in the address bar.",
+    where: "Contact",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

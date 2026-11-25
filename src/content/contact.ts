@@ -6,6 +6,14 @@ export const asks = ["you to build it", "help with the hard part", "a second opi
 /** When they want it. Each one has to end the sentence. */
 export const deadlines = ["this month", "this quarter", "whenever it's right"];
 
+/**
+ * An easter egg: the options a choice only offers after this many rolls. They
+ * follow the same rules as the visible ones, and the mail endpoint takes them.
+ */
+export const UNLOCK_ROLLS = 12;
+export const hiddenAsks = ["to play chess"];
+export const hiddenDeadlines = ["yesterday"];
+
 /** A finished note: each blank as written, and the ask and deadline as picked. */
 export type Note = {
   name: string;

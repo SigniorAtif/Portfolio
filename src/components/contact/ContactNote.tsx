@@ -9,8 +9,22 @@ import { Decode } from "@/components/motion/Text";
 import { OnScreen } from "@/components/ui/OnScreen";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { personal } from "@/content/about";
-import { asks, deadlines, delivery, hints, moods, noteText, thanks, timeZone } from "@/content/contact";
+import {
+  UNLOCK_ROLLS,
+  asks,
+  deadlines,
+  delivery,
+  hiddenAsks,
+  hiddenDeadlines,
+  hints,
+  moods,
+  noteText,
+  thanks,
+  timeZone,
+} from "@/content/contact";
+import type { EggId } from "@/content/eggs";
 import { site, socials } from "@/content/site";
+import { found } from "@/lib/eggs";
 import { sendNote } from "@/lib/sendNote";
 
 const EMAIL = /^\S+@\S+\.\S+$/;
@@ -81,8 +95,11 @@ const everyQuarterMinute = (onTick: () => void) => {
  */
 export function ContactNote() {
   const [text, setText] = useState(EMPTY);
-  const [ask, setAsk] = useState(0);
-  const [deadline, setDeadline] = useState(0);
+  const query = useSyncExternalStore(staysPut, () => window.location.search, () => "");
+  const ask = useRoller(asks, hiddenAsks, "ask", presetAsk(query));
+  const deadline = useRoller(deadlines, hiddenDeadlines, "deadline");
+  // An easter egg: arriving by the castle's name (/howl) paints it before it lands.
+  const howled = new URLSearchParams(query).get("from") === "howl";
   const [copied, setCopied] = useState(false);
   const [phase, setPhase] = useState<Phase>("writing");
   // Counts the notes written. A new one gets a new sheet and a new castle: the
@@ -97,6 +114,10 @@ export function ContactNote() {
     () => clock.format(new Date()),
     () => null,
   );
+
+  useEffect(() => {
+    if (howled) found("howl");
+  }, [howled]);
 
   const sent = phase === "sent";
   // The note is gone from the page, so the thank-you takes the focus the send button had.
@@ -115,7 +136,7 @@ export function ContactNote() {
   const missing = BLANKS.filter((id) => !filled[id]);
   const done = missing.length === 0;
 
-  const parts = { ...text, ask: asks[ask], deadline: deadlines[deadline] };
+  const parts = { ...text, ask: ask.picked, deadline: deadline.picked };
   const note = noteText(parts);
 
   const firstName = text.name.split(" ")[0].slice(0, 16);
@@ -153,8 +174,8 @@ export function ContactNote() {
 
   const again = () => {
     setText(EMPTY);
-    setAsk(0);
-    setDeadline(0);
+    ask.reset();
+    deadline.reset();
     setPhase("writing");
     setRound((count) => count + 1);
   };
@@ -270,10 +291,10 @@ export function ContactNote() {
                           Hi Atif, I&rsquo;m {blank("name", "Your name")}. I&rsquo;m making {blank("thing", "What you are making")}.
                         </span>
                         <span className="block">
-                          And I want <Choice label="What you want" options={asks} index={ask} onChange={setAsk} tail="," />
+                          And I want <Choice label="What you want" options={ask.options} index={ask.index} onChange={ask.roll} tail="," />
                         </span>
                         <span className="block">
-                          <Choice label="When" options={deadlines} index={deadline} onChange={setDeadline} tail="." />
+                          <Choice label="When" options={deadline.options} index={deadline.index} onChange={deadline.roll} tail="." />
                         </span>
                         <span className="block">Reach me at {blank("email", "Your email", "email")}.</span>
                       </p>
@@ -317,7 +338,11 @@ export function ContactNote() {
 
               {/* The reader, never taller than the screen can hold above the direct lines. Draws every frame, so it only lives while on screen, and only where there is room beside the note. */}
               <OnScreen className="aspect-[5/6] w-full max-lg:hidden lg:sticky lg:top-[12svh]">
-                <CastleDots spirits={(BLANKS.length - missing.length) / BLANKS.length} away={phase === "sending"} />
+                <CastleDots
+                  spirits={(BLANKS.length - missing.length) / BLANKS.length}
+                  away={phase === "sending"}
+                  painted={howled}
+                />
               </OnScreen>
               </motion.div>
             )}
@@ -410,6 +435,42 @@ function Blank({ ref, label, hint, inputMode, filled, onText, onEnter }: BlankPr
       }}
     />
   );
+}
+
+/** The query string never changes under the page, so there is nothing to subscribe to. */
+const staysPut = () => () => {};
+
+/** The ask a link presets with `?ask=<word>`, such as `?ask=build` for "you to build it", if any. */
+function presetAsk(query: string): number | null {
+  const word = new URLSearchParams(query).get("ask")?.toLowerCase();
+  const at = word ? asks.findIndex((option) => option.split(" ").includes(word)) : -1;
+  return at === -1 ? null : at;
+}
+
+/**
+ * One of the note's two choices. An easter egg: the roll that makes
+ * UNLOCK_ROLLS adds the hidden options to the cycle, lands on the first of
+ * them, and counts the find. They stay for the rest of the visit, a new note
+ * included. Until the choice is first rolled it shows `preset`, if given.
+ */
+function useRoller(visible: string[], hidden: string[], egg: EggId, preset: number | null = null) {
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [rolls, setRolls] = useState(0);
+  const options = rolls >= UNLOCK_ROLLS ? [...visible, ...hidden] : visible;
+  const index = chosen ?? preset ?? 0;
+  return {
+    options,
+    index,
+    picked: options[index],
+    roll: (next: number) => {
+      setRolls(rolls + 1);
+      if (rolls + 1 === UNLOCK_ROLLS) {
+        setChosen(visible.length);
+        found(egg);
+      } else setChosen(next);
+    },
+    reset: () => setChosen(0),
+  };
 }
 
 type ChoiceProps = {

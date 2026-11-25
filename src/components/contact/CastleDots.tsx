@@ -225,9 +225,19 @@ function load(file: string): Promise<HTMLImageElement> {
  * blanks fill, the painting spreads back across that share of it from the
  * nose, it steps livelier, and once the note is whole it is all colour and
  * lifts off the ground. While `away`, the note being on its way, it flies off across
- * the screen to the left, and a new note gets a new castle.
+ * the screen to the left, and a new note gets a new castle. `painted` keeps it
+ * all colour whatever the note says: the castle greeting a visitor who came by
+ * its name (/howl).
  */
-export function CastleDots({ spirits, away = false }: { spirits: number; away?: boolean }) {
+export function CastleDots({
+  spirits,
+  away = false,
+  painted = false,
+}: {
+  spirits: number;
+  away?: boolean;
+  painted?: boolean;
+}) {
   const running = useRef<{
     timeline: gsap.core.Timeline;
     arrival: gsap.core.Timeline;
@@ -237,13 +247,16 @@ export function CastleDots({ spirits, away = false }: { spirits: number; away?: 
   } | null>(null);
   const wanted = useRef(spirits);
   const leaving = useRef(away);
+  const inColour = useRef(painted);
+  /** Where the painting reaches for a note this far along, unless it is painted throughout. */
+  const colourFor = useCallback((share: number) => (inColour.current ? EDGE.after : reach(share)), []);
   const box = useRef<HTMLDivElement>(null);
 
   const open = useCallback((reduced: boolean): DotSource => {
     const pose = { ...REST };
     const timeline = gsap.timeline({ paused: reduced });
     walk(timeline, pose);
-    const look: Look = { colour: reach(wanted.current), edge: reduced ? EDGE.after : EDGE.before };
+    const look: Look = { colour: colourFor(wanted.current), edge: reduced ? EDGE.after : EDGE.before };
     const arrival = gsap.timeline({ paused: true });
     const now = { timeline, arrival, pose, look, reduced };
     running.current = now;
@@ -293,7 +306,17 @@ export function CastleDots({ spirits, away = false }: { spirits: number; away?: 
         running.current = null;
       },
     };
-  }, []);
+  }, [colourFor]);
+
+  useEffect(() => {
+    if (inColour.current === painted) return;
+    inColour.current = painted;
+    const now = running.current;
+    if (!now) return;
+    // Before it has glided in, the colour is simply set; after, it spreads.
+    if (now.reduced || now.arrival.progress() === 0) now.look.colour = colourFor(wanted.current);
+    else gsap.to(now.look, { colour: colourFor(wanted.current), duration: TURN, ease: "power2.inOut", overwrite: "auto" });
+  }, [painted, colourFor]);
 
   useEffect(() => {
     const changed = wanted.current !== spirits;
@@ -301,11 +324,11 @@ export function CastleDots({ spirits, away = false }: { spirits: number; away?: 
     const now = running.current;
     // On mount the arrival already heads for these values, and must not be cut short.
     if (!now || !changed) return;
-    if (now.reduced) now.look.colour = reach(spirits);
-    else gsap.to(now.look, { colour: reach(spirits), duration: TURN, ease: "power2.inOut", overwrite: "auto" });
+    if (now.reduced) now.look.colour = colourFor(spirits);
+    else gsap.to(now.look, { colour: colourFor(spirits), duration: TURN, ease: "power2.inOut", overwrite: "auto" });
     gsap.to(now.timeline, { timeScale: pace(spirits), duration: 0.8, ease: "power2.out", overwrite: true });
     gsap.to(now.pose, { lift: spirits >= 1 ? -LIFT : 0, duration: 1.4, ease: "power2.inOut", overwrite: "auto" });
-  }, [spirits]);
+  }, [spirits, colourFor]);
 
   useEffect(() => {
     const now = running.current;
