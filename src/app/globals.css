@@ -2454,3 +2454,139 @@ html[data-rury] .site-mark {
     visibility: hidden;
   }
 }
+
+/* Two of About's hobbies are easter eggs (components/eggs/HobbyEgg): the row
+   reads like the others, and only the pointer and the focus ring tell. */
+.busy-egg {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+/* The hobby eggs' sheet: the terminal's backdrop and bar, its own size. */
+.egg-sheet {
+  display: flex;
+  flex-direction: column;
+  /* All the backdrop leaves below its own padding. */
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background-color: var(--ground);
+  background-image: radial-gradient(color-mix(in oklab, var(--dot) 9%, transparent) 1px, transparent 1.3px);
+  background-size: 14px 14px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.55);
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--body);
+  outline: 0;
+  animation: term-open 0.22s var(--ease-out) both;
+}
+
+/* The chess puzzle (components/eggs/ChessPuzzle): White's pieces solid dots,
+   Black's rings, on squares told apart by a sheet of dots. */
+.chess {
+  width: min(480px, 100%);
+}
+.chess-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+.chess-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--line-strong);
+}
+.chess-square {
+  position: relative;
+  background: color-mix(in oklab, var(--dot) 7%, var(--ground));
+  cursor: pointer;
+}
+.chess-square[data-dark] {
+  background-color: var(--ground);
+  background-image: radial-gradient(color-mix(in oklab, var(--dot) 16%, transparent) 0.8px, transparent 1.1px);
+  background-size: 5px 5px;
+}
+.chess-square[data-last] {
+  box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--progress) 16%, transparent);
+}
+.chess-square[data-picked] {
+  box-shadow: inset 0 0 0 2px var(--done);
+}
+.chess-square:focus-visible {
+  z-index: 1;
+  outline-offset: -2px;
+}
+.chess-file,
+.chess-rank {
+  position: absolute;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--muted);
+  pointer-events: none;
+}
+.chess-file {
+  right: 3px;
+  bottom: 3px;
+}
+.chess-rank {
+  left: 3px;
+  top: 3px;
+}
+.chess-pieces {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.chess-piece {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 12.5%;
+  height: 12.5%;
+  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
+  transition: transform 0.3s var(--ease-out);
+}
+.chess-sprite {
+  width: 74%;
+  height: 74%;
+  overflow: visible;
+}
+.chess-piece[data-side="w"] .chess-sprite {
+  fill: var(--dot);
+}
+.chess-piece[data-side="b"] .chess-sprite {
+  fill: none;
+  stroke: var(--dot);
+  stroke-width: 0.17;
+}
+.chess-piece[data-side="b"] circle {
+  r: 0.3;
+}
+.chess-said {
+  min-height: 3.2em;
+  color: var(--ink);
+}
+.chess[data-solved] .chess-said {
+  color: var(--done);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .egg-sheet {
+    animation: none;
+  }
+  .chess-piece {
+    transition: none;
+  }
+}

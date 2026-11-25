@@ -101,6 +101,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "chess",
+    name: "Mate in two",
+    hint: "One of the hobbies on About is a button. White to play.",
+    where: "About",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

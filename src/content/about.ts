@@ -90,8 +90,14 @@ export const spoken = [
   },
 ];
 
-/** What else takes his time. */
-export const busy = ["Al-Qur'an", "Poetry", "Physics", "Chess", "Video Games"];
+/** What else takes his time. One of them opens an easter egg when pressed (components/eggs/HobbyEgg). */
+export const busy: { name: string; egg?: "chess" }[] = [
+  { name: "Al-Qur'an" },
+  { name: "Poetry" },
+  { name: "Physics" },
+  { name: "Chess", egg: "chess" },
+  { name: "Video Games" },
+];
 
 /** Where he is from. */
 export const homeTown = "Malda, West Bengal";
