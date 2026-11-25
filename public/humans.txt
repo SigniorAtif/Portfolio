@@ -1,0 +1,20 @@
+/* TEAM */
+Built by: Atif Ahmed
+Contact: note [at] ahmedatif.in
+GitHub: SigniorAtif
+From: Malda, West Bengal
+Lives in: Bhubaneswar, India
+
+/* THANKS */
+Toons: Iuri de Paula, whose old portfolio characters walk these pages (MIT)
+Castle: Howl's Moving Castle, for the company on the contact page
+
+/* SITE */
+Written: at 3am, from inside rury (Hyprland + Quickshell)
+Stack: Next.js 16, React 19, GSAP, Lenis, three.js, Tailwind 4
+Fonts: Bricolage Grotesque, JetBrains Mono, Bodoni Moda
+Standards: HTML, CSS, TypeScript
+Last update: 2026/11/25
+
+/* NOTE */
+You read humans.txt. Somewhere on this site there are more of these.

@@ -1,0 +1,9 @@
+# Found a hole? Thanks for knocking first.
+# There is no bug bounty. There is a sincere thank-you, and a fix.
+
+Contact: mailto:note@ahmedatif.in
+Expires: 2027-11-25T00:00:00.000Z
+Preferred-Languages: en, bn, hi
+Canonical: https://www.ahmedatif.in/.well-known/security.txt
+
+# Renew Expires before it passes: RFC 9116 wants it less than a year out.

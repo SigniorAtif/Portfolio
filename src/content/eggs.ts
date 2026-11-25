@@ -23,6 +23,20 @@ export const eggs = [
     where: "Home",
     tracked: true,
   },
+  {
+    id: "header",
+    name: "Hi, human",
+    hint: "Every page says hello where only developers look. Read the response headers.",
+    where: "The network tab",
+    tracked: false,
+  },
+  {
+    id: "files",
+    name: "The text files",
+    hint: "Crawlers get a file of instructions. So do humans, and so do security researchers.",
+    where: "The address bar",
+    tracked: false,
+  },
 ] as const satisfies readonly Egg[];
 
 export type EggId = (typeof eggs)[number]["id"];
