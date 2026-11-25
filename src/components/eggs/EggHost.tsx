@@ -7,10 +7,13 @@ import { onSummon, summon, type Summon } from "@/lib/eggs";
 // Each egg's code is its own chunk, fetched the first time it is set off.
 const RuryBar = dynamic(() => import("./RuryBar").then((mod) => mod.RuryBar), { ssr: false });
 const ToonParade = dynamic(() => import("./ToonParade").then((mod) => mod.ToonParade), { ssr: false });
+const Terminal = dynamic(() => import("./Terminal").then((mod) => mod.Terminal), { ssr: false });
 
 /** Typed sequences, as lowercased `KeyboardEvent.key` values, and the egg each one sets off. */
 const SEQUENCES: { keys: string[]; egg: Summon }[] = [
   { keys: [..."rury"], egg: "rury" },
+  { keys: ["`"], egg: "terminal" },
+  { keys: [..."sudo"], egg: "terminal" },
   // The Konami code: up up down down left right left right B A.
   { keys: ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"], egg: "parade" },
 ];
@@ -32,6 +35,7 @@ export function EggHost() {
   const [rury, setRury] = useState({ shown: false, open: false });
   // Each summon of the parade is a new one, so a second summon starts it over. 0 while none is on.
   const [parade, setParade] = useState(0);
+  const [terminal, setTerminal] = useState(false);
 
   useEffect(() => {
     let typed: string[] = [];
@@ -46,7 +50,8 @@ export function EggHost() {
       typed = [...typed, event.key.toLowerCase()].slice(-LONGEST);
       for (const { keys, egg } of SEQUENCES) {
         if (typed.length >= keys.length && keys.every((key, i) => typed[typed.length - keys.length + i] === key)) {
-          // The last key belongs to the egg, not the page.
+          // The last key belongs to the egg: unclaimed, the backtick (or the "o" of
+          // "sudo") would land in the terminal's field as it takes focus.
           event.preventDefault();
           typed = [];
           summon(egg);
@@ -58,6 +63,7 @@ export function EggHost() {
       // Typing it again puts the bar away; only that or a reload does.
       if (egg === "rury") setRury((now) => (now.open ? { shown: true, open: false } : { shown: true, open: true }));
       if (egg === "parade") setParade((count) => count + 1);
+      if (egg === "terminal") setTerminal(true);
     });
     return () => {
       window.removeEventListener("keydown", onKey);
@@ -67,11 +73,13 @@ export function EggHost() {
 
   const ruryClosed = useCallback(() => setRury({ shown: false, open: false }), []);
   const paradeDone = useCallback(() => setParade(0), []);
+  const terminalClosed = useCallback(() => setTerminal(false), []);
 
   return (
     <>
       {rury.shown && <RuryBar open={rury.open} onClosed={ruryClosed} />}
       {parade > 0 && <ToonParade key={parade} onDone={paradeDone} />}
+      {terminal && <Terminal onClose={terminalClosed} />}
     </>
   );
 }

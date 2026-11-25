@@ -1,6 +1,7 @@
 import { PageLink } from "@/components/transition/PageLink";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { footerNav, site, socials } from "@/content/site";
+import { EndMark } from "@/components/eggs/EndMark";
 import { FooterMark } from "./FooterMark";
 import { SpaceField } from "./SpaceField";
 
@@ -44,7 +45,7 @@ export async function Footer() {
       {/* Container and type sizes are BluePeak's: 90rem wide at most, 10px mono labels. */}
       <div className="mx-auto max-w-[90rem] px-[clamp(1rem,4vw,3rem)] pt-[clamp(2rem,3.5vw,3.5rem)] [&_.kicker]:text-[10px]">
         <div className="flex items-center gap-4">
-          <span className="kicker !text-ink">End //</span>
+          <EndMark />
           <a href="#top" className="hit text-[15px] font-semibold tracking-tight">
             {site.name}.
           </a>

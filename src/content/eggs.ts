@@ -66,6 +66,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "terminal",
+    name: "The terminal",
+    hint: "Developers keep a key for this, just above Tab.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",

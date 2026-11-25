@@ -1313,6 +1313,130 @@ html[data-rury] .site-mark {
   transition: color 1.2s var(--ease-out);
 }
 
+/* The terminal (components/eggs/Terminal): a sheet of dots over the page, in
+   mono. Over the rury bar (85) and the parade (80), under the toast (95). */
+.term-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 92;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(14svh, 16px) 16px 16px;
+  background: color-mix(in oklab, var(--ground) 62%, transparent);
+  backdrop-filter: blur(3px);
+}
+.term {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(540px, 72svh);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background-color: var(--ground);
+  background-image: radial-gradient(color-mix(in oklab, var(--dot) 9%, transparent) 1px, transparent 1.3px);
+  background-size: 14px 14px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.55);
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--body);
+  animation: term-open 0.22s var(--ease-out) both;
+}
+.term-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px dashed var(--line-strong);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.term-close {
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.term-close:hover,
+.term-close:focus-visible {
+  border-color: var(--ink);
+}
+.term-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 4px;
+}
+.term-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: term-line 0.16s ease-out both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+.term-line[data-typed] {
+  color: var(--muted);
+}
+.term-row {
+  display: flex;
+  gap: 1ch;
+  padding: 4px 16px 14px;
+}
+.term-prompt {
+  flex: none;
+  color: var(--done);
+}
+.term-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  caret-color: var(--done);
+}
+@keyframes term-open {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+}
+@keyframes term-line {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+@media (max-width: 639px) {
+  .term-backdrop {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+  /* Under 16px, phones zoom in on the field. */
+  .term-input {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .term,
+  .term-line {
+    animation: none;
+  }
+}
+/* "End //" in the footer opens the terminal on a long press. */
+.end-mark {
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
 /* The toon parade (components/eggs/ToonParade): the whole cast marching along
    the bottom of the screen. The row is moved by script; each toon hops to its
    own beat. Under the rury bar (85) and the toast (95), and never in the way. */
