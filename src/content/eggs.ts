@@ -80,6 +80,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "secrets",
+    name: "Secrets",
+    hint: "The site's own right-click menu has more in it. Hold Alt.",
+    where: "Anywhere",
+    tracked: true,
+  },
+  {
     id: "header",
     name: "Hi, human",
     hint: "Every page says hello where only developers look. Read the response headers.",
