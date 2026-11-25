@@ -1519,6 +1519,14 @@ html[data-rury] .site-mark {
 .footmark-in span {
   display: block;
 }
+/* The footer-name easter egg: quick clicks must not select the name or zoom the page. */
+.footmark {
+  user-select: none;
+  touch-action: manipulation;
+}
+.footmark:not([data-script="latin"]) .footmark-in {
+  gap: 0.24em;
+}
 
 /* ---------- about ---------- */
 /* A four-point star that winks in place. */

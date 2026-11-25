@@ -87,6 +87,13 @@ export const eggs = [
     tracked: true,
   },
   {
+    id: "names",
+    name: "Every script",
+    hint: "The big name at the very bottom answers to quick hands.",
+    where: "The footer",
+    tracked: true,
+  },
+  {
     id: "visits",
     name: "Welcome back",
     hint: "Keep coming back. The fifth visit is noticed.",
