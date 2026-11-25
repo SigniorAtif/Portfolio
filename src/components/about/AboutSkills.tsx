@@ -11,9 +11,14 @@ const two = (n: number) => String(n).padStart(2, "0");
  * The main skills, in the row language of home's project table: number, the
  * field in large type, what he uses for it, and how many. One highlight
  * slides to the row under the pointer, and that row's tools come up to full ink.
+ * When the pointer leaves, the highlight finishes its slide and fades out where it is.
  */
 export function AboutSkills({ skills }: { skills: Skill[] }) {
   const [lit, setLit] = useState<number | null>(null);
+  // The row the highlight was last sent to. It stays there after the pointer
+  // leaves, finishing its slide while it fades, and is cleared once it has faded.
+  const [rest, setRest] = useState<number | null>(null);
+  const at = lit ?? rest;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -37,16 +42,26 @@ export function AboutSkills({ skills }: { skills: Skill[] }) {
               <li
                 key={skill.name}
                 onPointerEnter={(event) => {
-                  if (event.pointerType === "mouse") setLit(i);
+                  if (event.pointerType !== "mouse") return;
+                  setLit(i);
+                  setRest(i);
                 }}
                 className="relative col-span-full grid grid-cols-subgrid items-baseline gap-y-3 border-b border-line py-6 sm:py-8"
               >
-                {on && (
+                {i === at && (
                   <motion.span
                     layoutId="skill-row"
                     aria-hidden="true"
                     className="absolute inset-x-[calc(var(--gutter)*-0.5)] inset-y-0 -z-10 rounded-[14px] bg-panel"
-                    transition={{ type: "spring", stiffness: 380, damping: 36 }}
+                    initial={false}
+                    animate={{ opacity: lit === null ? 0 : 1 }}
+                    transition={{
+                      layout: { type: "spring", stiffness: 380, damping: 36 },
+                      opacity: { duration: 0.25, ease: "easeOut" },
+                    }}
+                    onAnimationComplete={() => {
+                      if (lit === null) setRest(null);
+                    }}
                   />
                 )}
                 <span className={`kicker tabular-nums transition-colors duration-300 ${on ? "!text-ink" : ""}`}>{two(i + 1)}</span>
