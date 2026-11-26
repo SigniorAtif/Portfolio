@@ -1151,22 +1151,6 @@ html[data-rury] .site-mark {
   border: 0;
   background: color-mix(in srgb, var(--ink) 9%, transparent);
 }
-.cmenu-foot {
-  padding: 10px 10px 6px 28px;
-  border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
-  margin-top: 6px;
-  font-family: var(--font-code), monospace;
-  font-size: 10px;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--muted) 80%, transparent);
-}
-.cmenu-foot kbd {
-  padding: 0 4px;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  font-family: inherit;
-  color: var(--muted);
-}
 @media (prefers-reduced-motion: reduce) {
   .cmenu {
     animation: cmenu-fade 0.12s linear backwards;

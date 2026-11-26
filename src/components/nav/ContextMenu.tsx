@@ -481,9 +481,6 @@ export function ContextMenu() {
         </>
       )}
 
-      <p aria-hidden="true" className="cmenu-foot">
-        Hold <kbd>Shift</kbd> for the browser&rsquo;s menu
-      </p>
       <span role="status" className="sr-only">
         {done ? answer(done) : ""}
       </span>
