@@ -1,11 +1,12 @@
 import { cacheLife } from "next/cache";
 
 // The games Atif has finished to the last achievement, for the panel on About
-// (components/eggs/SteamPanel), read through app/api/steam. They are the games
-// in the Completionist showcase on his Steam profile, in the order he set
-// there. Server only: the key is read from the environment here and never
-// leaves this file. Anything Steam can't give comes back as "unavailable" with
-// the reason, and the panel falls back to the site's own eggs.
+// (components/eggs/SteamPanel), read through app/api/steam. The ones in the
+// Completionist showcase on his Steam profile come first, in the order he set
+// there; every other game he has 100% follows, newest finish first. Server
+// only: the key is read from the environment here and never leaves this file.
+// Anything Steam can't give comes back as "unavailable" with the reason, and
+// the panel falls back to the site's own eggs.
 //
 // Needs, in the environment:
 //   STEAM_API_KEY  a Web API key from steamcommunity.com/dev/apikey
@@ -15,6 +16,14 @@ const API = "https://api.steampowered.com";
 /** Steam's number for the Completionist showcase among a profile's customizations. */
 const COMPLETIONIST = 23;
 const TIMEOUT_MS = 8_000;
+/** Games per achievements call, so the URL stays short however big the library gets. */
+const BATCH = 50;
+/** More than any game has, so a call gives back every achievement a player holds. */
+const EVERY = "10000";
+/** Where the store's art lives; a game's own paths are relative to it. */
+const ASSETS = "https://shared.steamstatic.com/store_item_assets/";
+/** The old fixed path for a game's portrait art. Newer games only have it under a hashed path. */
+const oldCover = (appid: number) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`;
 
 export type Perfect = {
   appid: number;
@@ -29,8 +38,14 @@ export type Perfect = {
   /** The rarest achievement in it, and the share of all its players who have it. */
   rarest: { name: string; percent: number } | null;
 };
-export type Showcase =
-  | { status: "ok"; games: Perfect[] }
+export type SteamGames =
+  | {
+      status: "ok";
+      /** The Completionist showcase, in its order. */
+      showcased: Perfect[];
+      /** Every other game at 100%, newest finish first. */
+      rest: Perfect[];
+    }
   | { status: "unavailable"; reason: "no-key" | "private" | "empty" | "error" };
 
 type Customizations = {
@@ -43,6 +58,11 @@ type TopAchievements = {
   };
 };
 type PlayerAchievements = { playerstats?: { achievements?: { achieved: number; unlocktime: number }[] } };
+type StoreItems = {
+  response?: {
+    store_items?: { appid?: number; assets?: { asset_url_format?: string; library_capsule?: string } }[];
+  };
+};
 
 /** One call to the Web API. A failure says which call and how, never the URL, which holds the key. */
 async function get<T>(path: string, params: Record<string, string>): Promise<T> {
@@ -86,11 +106,57 @@ async function progress(appid: number, key: string, steamid: string) {
 const listed = (name: string, ids: number[]) => Object.fromEntries(ids.map((id, i) => [`${name}[${i}]`, String(id)]));
 
 /**
- * The games Atif has finished to the last achievement, as his profile shows
- * them. A good answer is kept for hours, so Steam hears from the site once a
- * window at most; a failed one only for minutes, so a fix shows up soon.
+ * Each game's portrait art (2:3, 300 by 450), from the store. Newer games keep
+ * it under a hashed path that only the store knows. A game the store doesn't
+ * answer for, or a store that doesn't answer, gets the old fixed path.
  */
-export async function perfectGames(): Promise<Showcase> {
+async function covers(ids: number[]) {
+  const found = new Map<number, string>();
+  try {
+    const store = await get<StoreItems>("/IStoreBrowseService/GetItems/v1/", {
+      input_json: JSON.stringify({
+        ids: ids.map((appid) => ({ appid })),
+        context: { language: "english", country_code: "US" },
+        data_request: { include_assets: true },
+      }),
+    });
+    for (const item of store.response?.store_items ?? []) {
+      const { asset_url_format: format, library_capsule: file } = item.assets ?? {};
+      if (item.appid && format && file) found.set(item.appid, ASSETS + format.replace("${FILENAME}", file));
+    }
+  } catch {
+    // Art is a nicety: every game falls back to the old path below.
+  }
+  return (appid: number) => found.get(appid) ?? oldCover(appid);
+}
+
+/**
+ * Every achievement Atif holds in each of these games, rarest first, with how
+ * many each game has. One call per batch, rather than one per game.
+ */
+async function held(ids: number[], key: string, steamid: string) {
+  const batches = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) => ids.slice(i * BATCH, (i + 1) * BATCH));
+  const answers = await Promise.all(
+    batches.map((batch) =>
+      get<TopAchievements>("/IPlayerService/GetTopAchievementsForGames/v1/", {
+        key,
+        steamid,
+        language: "english",
+        max_achievements: EVERY,
+        ...listed("appids", batch),
+      }),
+    ),
+  );
+  return new Map(answers.flatMap((answer) => answer.response?.games ?? []).map((game) => [game.appid, game]));
+}
+
+/**
+ * The games Atif has finished to the last achievement: the showcase on his
+ * profile, then the rest. A good answer is kept for hours, so Steam hears from
+ * the site once a window at most; a failed one only for minutes, so a fix
+ * shows up soon.
+ */
+export async function perfectGames(): Promise<SteamGames> {
   "use cache";
   const key = process.env.STEAM_API_KEY;
   const steamid = process.env.STEAM_ID;
@@ -99,28 +165,14 @@ export async function perfectGames(): Promise<Showcase> {
     return { status: "unavailable", reason: "no-key" };
   }
   try {
-    const ids = await showcased(key, steamid);
-    if (!ids.length) {
-      cacheLife("minutes");
-      return { status: "unavailable", reason: "empty" };
-    }
-    const [owned, top, done] = await Promise.all([
+    const [owned, shelf] = await Promise.all([
       get<OwnedGames>("/IPlayerService/GetOwnedGames/v1/", {
         key,
         steamid,
         include_appinfo: "1",
         include_played_free_games: "1",
-        ...listed("appids_filter", ids),
       }),
-      // Rarest first, so the first achievement given back for each game is its rarest.
-      get<TopAchievements>("/IPlayerService/GetTopAchievementsForGames/v1/", {
-        key,
-        steamid,
-        language: "english",
-        max_achievements: "1",
-        ...listed("appids", ids),
-      }),
-      Promise.all(ids.map((appid) => progress(appid, key, steamid))),
+      showcased(key, steamid),
     ]);
     // Private game details answer with an empty response rather than an error.
     const games = owned.response?.games;
@@ -128,34 +180,59 @@ export async function perfectGames(): Promise<Showcase> {
       cacheLife("minutes");
       return { status: "unavailable", reason: "private" };
     }
+    // A game never launched has no achievements to its name, so only played ones are asked about.
+    const tops = await held(
+      games.filter((game) => game.playtime_forever > 0).map((game) => game.appid),
+      key,
+      steamid,
+    );
+    const done = (appid: number) => {
+      const top = tops.get(appid);
+      const total = top?.total_achievements ?? 0;
+      return total > 0 && (top?.achievements?.length ?? 0) >= total;
+    };
+    const ids = [...new Set([...shelf, ...games.map((game) => game.appid).filter(done)])];
+    if (!ids.length) {
+      cacheLife("minutes");
+      return { status: "unavailable", reason: "empty" };
+    }
+    const [finished, cover] = await Promise.all([
+      Promise.all(ids.map((appid) => progress(appid, key, steamid))),
+      covers(ids),
+    ]);
     const owns = new Map(games.map((game) => [game.appid, game]));
-    const tops = new Map((top.response?.games ?? []).map((game) => [game.appid, game]));
-    const shelf = ids.flatMap((appid, i): Perfect[] => {
+    const perfect = ids.flatMap((appid, i): Perfect[] => {
       const game = owns.get(appid);
       if (!game) return [];
-      const best = tops.get(appid);
-      const total = done[i]?.total || best?.total_achievements || 0;
-      const rare = best?.achievements?.[0];
-      const percent = Number(rare?.player_percent_unlocked);
+      const top = tops.get(appid);
+      const total = finished[i]?.total || top?.total_achievements || 0;
+      // The list comes rarest first, but the smallest share is picked rather than trusting the order.
+      const rare = (top?.achievements ?? [])
+        .map((item) => ({ name: item.name, percent: Number(item.player_percent_unlocked) }))
+        .filter((item) => Number.isFinite(item.percent))
+        .reduce<{ name: string; percent: number } | null>((low, item) => (!low || item.percent < low.percent ? item : low), null);
       return [
         {
           appid,
           name: game.name.replace(/[™®]/g, "").trim(),
-          cover: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
+          cover: cover(appid),
           hours: Math.round(game.playtime_forever / 60),
-          unlocked: done[i]?.unlocked ?? total,
+          unlocked: finished[i]?.unlocked ?? top?.achievements?.length ?? total,
           total,
-          completed: done[i]?.completed ?? null,
-          rarest: rare && Number.isFinite(percent) ? { name: rare.name, percent } : null,
+          completed: finished[i]?.completed ?? null,
+          rarest: rare,
         },
       ];
     });
-    if (!shelf.length) {
-      cacheLife("minutes");
-      return { status: "unavailable", reason: "empty" };
-    }
+    const onShelf = new Set(shelf);
     cacheLife("hours");
-    return { status: "ok", games: shelf };
+    return {
+      status: "ok",
+      showcased: perfect.filter((game) => onShelf.has(game.appid)),
+      rest: perfect
+        .filter((game) => !onShelf.has(game.appid))
+        .sort((a, b) => (b.completed ?? 0) - (a.completed ?? 0)),
+    };
   } catch {
     cacheLife("minutes");
     return { status: "unavailable", reason: "error" };

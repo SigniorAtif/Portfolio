@@ -833,6 +833,88 @@ html[data-rury] .site-mark {
 .site-mark-links a:is(:hover, :focus-visible, [aria-current="page"]) {
   color: var(--ink);
 }
+/* The profiles, as icons in the top-right corner, level with the name. They
+   show and hide with the links. */
+.site-mark-socials {
+  position: fixed;
+  top: 24px;
+  right: var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  /* One line of the name tall, so the icons centre on it. */
+  height: calc(26px * 1.2);
+  color: var(--muted);
+  pointer-events: auto;
+  transition:
+    opacity 0.35s var(--ease-out),
+    visibility 0s;
+}
+.site-mark-socials a {
+  display: grid;
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.site-mark-socials a:is(:hover, :focus-visible) {
+  color: var(--ink);
+}
+.site-mark-socials svg {
+  width: 20px;
+  height: 20px;
+}
+/* In the folded chip the icons ride inside it, after the links, so the hover
+   that opened it reaches them; the corner copy is for the full bar only.
+   Below 500px the opened chip can't hold them and they sit in a row under it
+   instead (see the phone rules further down). */
+.site-mark-inline {
+  display: none;
+}
+@media (min-width: 500px) {
+  .site-mark[data-state="mark"] .site-mark-inline {
+    display: flex;
+    align-self: center;
+    align-items: center;
+    gap: 16px;
+  }
+  .site-mark[data-state="mark"] .site-mark-socials {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+.site-mark-inline a {
+  display: grid;
+  transition: color var(--dur-hover) var(--ease-hover);
+}
+.site-mark-inline a:is(:hover, :focus-visible) {
+  color: var(--ink);
+}
+.site-mark-inline svg {
+  width: 18px;
+  height: 18px;
+}
+.site-mark-sep {
+  width: 1px;
+  height: 16px;
+  margin-right: 2px;
+  background: var(--line-strong);
+}
+/* Far enough apart that two thumb-sized hit areas don't overlap. */
+@media (pointer: coarse) {
+  .site-mark-socials {
+    gap: 24px;
+  }
+  .site-mark[data-state="mark"] .site-mark-inline {
+    gap: 26px;
+  }
+}
+.site-mark:not([data-state="full"], [data-open="true"]) .site-mark-socials {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.35s var(--ease-out),
+    visibility 0s 0.35s;
+}
 /* By touch the chip is the one way round the site, so it is made for a thumb:
    the name and the links catch taps across 44px, the whole folded chip opens
    it, and the chip is near opaque, so text passing under it never shows. */
@@ -895,9 +977,34 @@ html[data-rury] .site-mark {
     gap: 14px;
     font-size: 16px;
   }
+  .site-mark-socials {
+    height: calc(22px * 1.2);
+  }
   /* The gutter is narrower than the chip's padding wants: nudge the chip in. */
   .site-mark[data-state="mark"] .site-mark-bar {
     transform: translateX(6px);
+  }
+}
+/* Too narrow for the opened chip to hold the icons: they sit in a row under
+   it, over the frost. */
+@media (max-width: 499px) {
+  .site-mark[data-state="mark"] .site-mark-socials {
+    top: calc(24px + 22px * 1.2 + 18px);
+    right: auto;
+    /* Under the name, which the folded chip's nudge moves 6px in. */
+    left: calc(var(--gutter) + 6px);
+  }
+}
+/* Too narrow for the icons beside the full bar's links as well: they wait for
+   the chip to be opened. */
+@media (max-width: 479px) {
+  .site-mark:not([data-open="true"]) .site-mark-socials {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.35s var(--ease-out),
+      visibility 0s 0.35s;
   }
 }
 
@@ -1043,22 +1150,6 @@ html[data-rury] .site-mark {
   margin: 6px 10px 6px 28px;
   border: 0;
   background: color-mix(in srgb, var(--ink) 9%, transparent);
-}
-.cmenu-foot {
-  padding: 10px 10px 6px 28px;
-  border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
-  margin-top: 6px;
-  font-family: var(--font-code), monospace;
-  font-size: 10px;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--muted) 80%, transparent);
-}
-.cmenu-foot kbd {
-  padding: 0 4px;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  font-family: inherit;
-  color: var(--muted);
 }
 @media (prefers-reduced-motion: reduce) {
   .cmenu {
@@ -2582,8 +2673,8 @@ html[data-rury] .site-mark {
   color: var(--done);
 }
 
-/* The Steam panel (components/eggs/SteamPanel): a ruled list of finished
-   games, cover on the left, achievements on the right. */
+/* The Steam panel (components/eggs/SteamPanel): ruled lists of finished
+   games, the showcase then the rest, cover on the left, achievements on the right. */
 .steam {
   width: min(620px, 100%);
 }
@@ -2600,6 +2691,21 @@ html[data-rury] .site-mark {
 .steam-list {
   margin-top: 12px;
   border-top: 1px solid var(--line);
+}
+.steam-shelf + .steam-shelf {
+  margin-top: 22px;
+}
+.steam-group {
+  margin-top: 16px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.steam-group + .steam-list {
+  margin-top: 8px;
 }
 .steam-row {
   display: grid;

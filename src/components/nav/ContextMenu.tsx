@@ -402,6 +402,11 @@ export function ContextMenu() {
         <button type="button" {...row} data-label="Refresh" onClick={() => window.location.reload()}>
           Refresh
         </button>
+      </div>
+
+      <hr className="cmenu-rule" />
+
+      <div role="group" aria-label="Elsewhere">
         {socials.map((social) => (
           <a
             key={social.href}
@@ -476,9 +481,6 @@ export function ContextMenu() {
         </>
       )}
 
-      <p aria-hidden="true" className="cmenu-foot">
-        Hold <kbd>Shift</kbd> for the browser&rsquo;s menu
-      </p>
       <span role="status" className="sr-only">
         {done ? answer(done) : ""}
       </span>
