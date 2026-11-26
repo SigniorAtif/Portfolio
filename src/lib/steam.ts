@@ -20,6 +20,10 @@ const TIMEOUT_MS = 8_000;
 const BATCH = 50;
 /** More than any game has, so a call gives back every achievement a player holds. */
 const EVERY = "10000";
+/** Where the store's art lives; a game's own paths are relative to it. */
+const ASSETS = "https://shared.steamstatic.com/store_item_assets/";
+/** The old fixed path for a game's portrait art. Newer games only have it under a hashed path. */
+const oldCover = (appid: number) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`;
 
 export type Perfect = {
   appid: number;
@@ -54,6 +58,11 @@ type TopAchievements = {
   };
 };
 type PlayerAchievements = { playerstats?: { achievements?: { achieved: number; unlocktime: number }[] } };
+type StoreItems = {
+  response?: {
+    store_items?: { appid?: number; assets?: { asset_url_format?: string; library_capsule?: string } }[];
+  };
+};
 
 /** One call to the Web API. A failure says which call and how, never the URL, which holds the key. */
 async function get<T>(path: string, params: Record<string, string>): Promise<T> {
@@ -95,6 +104,31 @@ async function progress(appid: number, key: string, steamid: string) {
 
 /** Steam's way of passing a list: `name[0]`, `name[1]`, and so on. */
 const listed = (name: string, ids: number[]) => Object.fromEntries(ids.map((id, i) => [`${name}[${i}]`, String(id)]));
+
+/**
+ * Each game's portrait art (2:3, 300 by 450), from the store. Newer games keep
+ * it under a hashed path that only the store knows. A game the store doesn't
+ * answer for, or a store that doesn't answer, gets the old fixed path.
+ */
+async function covers(ids: number[]) {
+  const found = new Map<number, string>();
+  try {
+    const store = await get<StoreItems>("/IStoreBrowseService/GetItems/v1/", {
+      input_json: JSON.stringify({
+        ids: ids.map((appid) => ({ appid })),
+        context: { language: "english", country_code: "US" },
+        data_request: { include_assets: true },
+      }),
+    });
+    for (const item of store.response?.store_items ?? []) {
+      const { asset_url_format: format, library_capsule: file } = item.assets ?? {};
+      if (item.appid && format && file) found.set(item.appid, ASSETS + format.replace("${FILENAME}", file));
+    }
+  } catch {
+    // Art is a nicety: every game falls back to the old path below.
+  }
+  return (appid: number) => found.get(appid) ?? oldCover(appid);
+}
 
 /**
  * Every achievement Atif holds in each of these games, rarest first, with how
@@ -162,7 +196,10 @@ export async function perfectGames(): Promise<SteamGames> {
       cacheLife("minutes");
       return { status: "unavailable", reason: "empty" };
     }
-    const finished = await Promise.all(ids.map((appid) => progress(appid, key, steamid)));
+    const [finished, cover] = await Promise.all([
+      Promise.all(ids.map((appid) => progress(appid, key, steamid))),
+      covers(ids),
+    ]);
     const owns = new Map(games.map((game) => [game.appid, game]));
     const perfect = ids.flatMap((appid, i): Perfect[] => {
       const game = owns.get(appid);
@@ -178,7 +215,7 @@ export async function perfectGames(): Promise<SteamGames> {
         {
           appid,
           name: game.name.replace(/[™®]/g, "").trim(),
-          cover: `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
+          cover: cover(appid),
           hours: Math.round(game.playtime_forever / 60),
           unlocked: finished[i]?.unlocked ?? top?.achievements?.length ?? total,
           total,
