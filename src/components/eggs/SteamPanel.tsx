@@ -3,22 +3,73 @@
 import { useEffect, useRef, useState } from "react";
 import { tracked } from "@/content/eggs";
 import { found, useEggs } from "@/lib/eggs";
-import type { Showcase } from "@/lib/steam";
+import type { Perfect, SteamGames } from "@/lib/steam";
 
 /** Rare ones read to a tenth of a percent; common ones to the whole. */
 const share = (percent: number) => `${percent < 10 ? percent.toFixed(1) : Math.round(percent)}%`;
 /** The month a game was finished, as "Mar 2025". */
 const month = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
+/** One finished game: cover, name, hours and finish date, its rarest achievement, the count. */
+function Game({ game }: { game: Perfect }) {
+  return (
+    <li className="steam-row steam-perfect">
+      {/* eslint-disable-next-line @next/next/no-img-element -- Steam's own cover art, straight from its CDN: nothing to optimise. */}
+      <img
+        src={game.cover}
+        alt=""
+        width={48}
+        height={72}
+        loading="lazy"
+        className="steam-cover"
+        onError={(event) => (event.currentTarget.style.visibility = "hidden")}
+      />
+      <span className="steam-name">
+        {game.name}
+        <span className="steam-game">
+          {game.hours} h{game.completed ? ` · 100% ${month(game.completed)}` : ""}
+        </span>
+        {game.rarest && (
+          <span className="steam-game">
+            Rarest: {game.rarest.name}, {share(game.rarest.percent)}
+            <span className="sr-only"> of players have it</span>
+          </span>
+        )}
+      </span>
+      <span className="steam-share">
+        {game.unlocked}/{game.total}
+        <span className="sr-only"> achievements</span>
+      </span>
+    </li>
+  );
+}
+
+/** A labelled run of games, left out when it has none. */
+function Shelf({ title, games }: { title: string; games: Perfect[] }) {
+  if (!games.length) return null;
+  return (
+    <section className="steam-shelf">
+      <h3 className="steam-group">
+        {title} <span aria-hidden="true">·</span> {games.length}
+      </h3>
+      <ol className="steam-list">
+        {games.map((game) => (
+          <Game key={game.appid} game={game} />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 /**
- * The Steam egg: "Video Games" on About opens the games Atif has finished to
- * the last achievement, the Completionist showcase on his Steam profile, from
- * app/api/steam. When Steam can't answer (no key, a private profile, an error)
+ * The Steam egg: "Video Games" on About opens every game Atif has finished to
+ * the last achievement, from app/api/steam: the Completionist showcase on his
+ * Steam profile first, then the rest. When Steam can't answer (no key, a private profile, an error)
  * it shows the achievements this site keeps instead: the eggs, found ones by
  * name. Opening it records the egg. Esc closes. Styles are `.steam` in globals.css.
  */
 export function SteamPanel({ onClose }: { onClose: () => void }) {
-  const [result, setResult] = useState<Showcase | null>(null);
+  const [result, setResult] = useState<SteamGames | null>(null);
   const { found: finds, count, total } = useEggs();
   const sheetRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -29,7 +80,7 @@ export function SteamPanel({ onClose }: { onClose: () => void }) {
     sheetRef.current?.focus({ preventScroll: true });
     const ask = new AbortController();
     fetch("/api/steam", { signal: ask.signal })
-      .then((response) => (response.ok ? (response.json() as Promise<Showcase>) : Promise.reject(new Error("steam route"))))
+      .then((response) => (response.ok ? (response.json() as Promise<SteamGames>) : Promise.reject(new Error("steam route"))))
       .then(setResult, () => {
         if (!ask.signal.aborted) setResult({ status: "unavailable", reason: "error" });
       });
@@ -79,39 +130,12 @@ export function SteamPanel({ onClose }: { onClose: () => void }) {
 
           {result?.status === "ok" && (
             <>
-              <p className="steam-note">Every achievement, in every one. Off Atif&apos;s Steam profile.</p>
-              <ol className="steam-list">
-                {result.games.map((game) => (
-                  <li key={game.appid} className="steam-row steam-perfect">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Steam's own cover art, straight from its CDN: nothing to optimise. */}
-                    <img
-                      src={game.cover}
-                      alt=""
-                      width={48}
-                      height={72}
-                      loading="lazy"
-                      className="steam-cover"
-                      onError={(event) => (event.currentTarget.style.visibility = "hidden")}
-                    />
-                    <span className="steam-name">
-                      {game.name}
-                      <span className="steam-game">
-                        {game.hours} h{game.completed ? ` · 100% ${month(game.completed)}` : ""}
-                      </span>
-                      {game.rarest && (
-                        <span className="steam-game">
-                          Rarest: {game.rarest.name}, {share(game.rarest.percent)}
-                          <span className="sr-only"> of players have it</span>
-                        </span>
-                      )}
-                    </span>
-                    <span className="steam-share">
-                      {game.unlocked}/{game.total}
-                      <span className="sr-only"> achievements</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <p className="steam-note">
+                {result.showcased.length + result.rest.length} games, every achievement in each. Off Atif&apos;s Steam
+                profile.
+              </p>
+              <Shelf title="Showcase" games={result.showcased} />
+              <Shelf title="Also 100%" games={result.rest} />
             </>
           )}
 
