@@ -19,8 +19,12 @@ export const site = {
 
 export type SiteLink = { label: string; href: string };
 
-/** LinkedIn and the CV join this list when they exist. */
-export const socials: SiteLink[] = [{ label: "GitHub", href: "https://github.com/SigniorAtif" }];
+/** The CV joins this list when it exists. */
+export const socials: SiteLink[] = [
+  { label: "GitHub", href: "https://github.com/SigniorAtif" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/signioratif" },
+  { label: "Instagram", href: "https://www.instagram.com/signior_atif/" },
+];
 
 /** Sections of the landing page, in page order. The hero's scroll cue reads it. */
 export const nav: SiteLink[] = [
