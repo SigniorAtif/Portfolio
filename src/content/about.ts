@@ -101,6 +101,3 @@ export const busy: { name: string; egg?: "chess" | "steam" }[] = [
 
 /** Where he is from. */
 export const homeTown = "Malda, West Bengal";
-
-/** Links that belong on the about page only. */
-export const personal = [{ label: "Instagram", href: "https://www.instagram.com/signior_atif/" }];

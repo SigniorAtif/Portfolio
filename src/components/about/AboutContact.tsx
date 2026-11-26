@@ -5,7 +5,6 @@ import { SpaceField } from "@/components/footer/SpaceField";
 import { Decode } from "@/components/motion/Text";
 import { gsap, inView, useGSAP } from "@/lib/gsap";
 import { DUR, EASE, reducedMotion } from "@/lib/motion";
-import { personal } from "@/content/about";
 import { site, socials } from "@/content/site";
 import { SwapLabel } from "@/components/ui/SwapLabel";
 import { Twinkles } from "./Sparks";
@@ -84,7 +83,7 @@ export function AboutContact({ kicker = "07 / Say hello" }: { kicker?: string })
           ]}
         />
         <ul className="flex flex-wrap gap-x-7 gap-y-2 font-mono text-sm tracking-[0.06em] text-muted touch:gap-y-[26px]">
-          {[...socials, ...personal].map((link) => (
+          {socials.map((link) => (
             <li key={link.href}>
               <a href={link.href} target="_blank" rel="noopener noreferrer" className="link-line hit hover:text-ink">
                 <SwapLabel>{link.label}</SwapLabel>
