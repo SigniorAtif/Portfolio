@@ -402,6 +402,11 @@ export function ContextMenu() {
         <button type="button" {...row} data-label="Refresh" onClick={() => window.location.reload()}>
           Refresh
         </button>
+      </div>
+
+      <hr className="cmenu-rule" />
+
+      <div role="group" aria-label="Elsewhere">
         {socials.map((social) => (
           <a
             key={social.href}
