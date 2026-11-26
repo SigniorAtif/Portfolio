@@ -2582,8 +2582,8 @@ html[data-rury] .site-mark {
   color: var(--done);
 }
 
-/* The Steam panel (components/eggs/SteamPanel): a ruled list of finished
-   games, cover on the left, achievements on the right. */
+/* The Steam panel (components/eggs/SteamPanel): ruled lists of finished
+   games, the showcase then the rest, cover on the left, achievements on the right. */
 .steam {
   width: min(620px, 100%);
 }
@@ -2600,6 +2600,21 @@ html[data-rury] .site-mark {
 .steam-list {
   margin-top: 12px;
   border-top: 1px solid var(--line);
+}
+.steam-shelf + .steam-shelf {
+  margin-top: 22px;
+}
+.steam-group {
+  margin-top: 16px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.steam-group + .steam-list {
+  margin-top: 8px;
 }
 .steam-row {
   display: grid;
